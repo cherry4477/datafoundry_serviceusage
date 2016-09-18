@@ -15,7 +15,7 @@ _test
 *.cgo2.c
 _cgo_defun.c
 _cgo_gotypes.go
-_cgo_export.*datahub-subscriptions
+_cgo_export.*
 
 _testmain.go
 
@@ -28,7 +28,7 @@ _testmain.go
 _vendor
 build.sh
 dev*
-datafoundry_appmarket*
+datafoundry_serviceusage*
 docker-compose.yml
 start-dev.sh
 .idea/
