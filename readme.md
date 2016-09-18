@@ -1,20 +1,13 @@
 
-
-
-
 ## 
 
 套餐价格的变更必须提前（数个轮询周期）同步到usage模块。
-
-付费模式：
-* 预付费，包时长。
-* 后付费，按使用时长一段一段收费。
 
 使用的services自动视为订单？ DF_PURCHASE_ORDER表并不需要？
 
 ```
 套餐在内存中的表示：
-Price {
+PlanPrice {
     UniqueID
     Money
     Duration
@@ -24,16 +17,17 @@ Plan {
     PlanID
     Name
     Info
-    []Price
+    Prices []PlanPrice // sorted by StartTime
 }
 
 订单类型：
-- 预定时长(在终止时间之前，服务都有效)
-- 每单位时长扣费（定时轮询）
+- 预付费，包时长 (在终止时间之前，服务都有效)
+- 后付费，按使用时长一段一段收费（定时轮询）
 
 订单属性：
+- 对应的service instance
 - 开始时间
-- 结束时间（对单位时长扣类型，表示服务终止时间）
+- 结束时间（对后付费类型，只在订单结束后有效，表示服务终止时间）
 - 类型(预扣费，后付费)
 
 历史帐单：
@@ -43,8 +37,6 @@ Plan {
 - OrderId
 - PlanUniqueId
 
-API：
-- 
 ```
 
 ## 数据库设计
@@ -53,7 +45,7 @@ API：
 CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
    ORDER_ID           VARCHAR(32) NOT NULL,
-   TYPE                  COMMENT 'prepay, postpay',
+   TYPE                  COMMENT 'prepay, postpay. etc',
    USER               VARCHAR(120) NOT NULL,
    SERVICE_ID         ,
    SERVICE_QUANTITIES ,
@@ -101,11 +93,15 @@ create order
 
 ### PUT /usageapi/v1/purchaseorders/{orderId}
 
-modify order (cancel, upgrade, price changes)
+modify order (cancel, upgrade, renew, price changes)
 
 ### GET /usageapi/v1/purchaseorders/{orderId}
 
 get order
+
+### GET /usageapi/v1/purchaseorders
+
+get orders
 
 ## 部署
 
