@@ -1,7 +1,7 @@
 
 ## Overview
 
-一个服务配置对应若干套餐，一般一个预付费套餐和一个后付费套餐，或者只有两值之一。
+一个服务配置对应若干套餐，一般一个预付费套餐和一个后付费套餐，或者只有两者之一。
 
 用户选择一个服务配置+一个套餐，生成一个订单，开启一个服务实例。一个订单对应一个服务实例。
 
@@ -12,102 +12,172 @@
  * 本模块将每隔数小时查询更新一次套餐信息。
  * 套餐的价格变动最好提前至少一个计费周期发布。
 
-本模块负责消费报表的生成，包括每个服务实例每个计费周期的开销和每个帐户每个计费周期的开销。
+本模块负责消费报表（消费记录）的生成，即每个订单（服务实例）每个计费周期的消费额。
 
 本模块也将提供一个帐户消费速度查询接口。
 
-## API设计
+概念：
+* 订单计费步长: 消费阶梯递增时间单位。
+* 最短消费时间: 必须为消费步长的整数倍数。
+* 消费报表的时间间隔: 必须为消费步长的整数倍数，必须大于等于最短消费时间。
 
-### GET /usageapi/v1/usages?user={userId}&order={orderId}&starttime={startTime}&endtime={endTime}
+## APIs
 
+### GET /usageapi/v1/usages?order={orderId}&timestep={timeStep}&starttime={startTime}&endtime={endTime}
+
+1. 管理员查询任何订单的历史消费记录。
+1. 当前用户查询自己订单的历史消费记录。
+
+Query Parameters:
 ```
-order参数将压制user参数
+orderId: 订单号。可省略，表示所有订单。
+timeStep: day|month，至少支持月，是否支持天视订单计费步长大小而定。
+startTime: 开始时间
+endTime: 结束时间
 ```
 
-### GET /usageapi/v1/speed?user={userId}&order={orderId}&time={time}
-
+Return Result:
 ```
-order参数将压制user参数
+code: 返回码
+msg: 返回信息
+data.total
+data.results
+data.results[0].time
+data.results[0].orders
+data.results[0].orders[0].consuming
+......
+...
+```
+
+### GET /usageapi/v1/speed?account={accountId}
+
+1. 管理员查询任何帐户的当前消费速度。
+1. 当前用户查询自己帐户的当前消费速度。
+
+当前消费中（尚未终止）的订单的速度总和。
+
+Query Parameters:
+```
+accountId: 被查询的帐户。不可省略。
+```
+
+Return Result:
+```
+code: 返回码
+msg: 返回信息
+data.moeny
+data.duration
 ```
 
 ### POST /usageapi/v1/orders
 
-```
-create order
+管理员（创建一个服务实例的时候）创建一个订单。
 
-{
-    userId
-    serviceId
-    planId
-    startTime
-    endTime
-}
+Body Parameters (json):
+```
+accountId
+serviceId
+planId
+startTime
+usageDuration: 使用时长，只对预付费付费有效。
 ```
 
 ### PUT /usageapi/v1/orders/{orderId}
 
-```
-create order
+管理员（修改一个服务实例的时候）修改一个订单。
 
-{
-    action: cancel | renew | modify
-    planId: for modify only
-    endTime: for renew only
-}
+Path Parameters:
+```
+orderId: 订单号。
+```
+
+Body Parameters (json):
+```
+action: stop | renew | modify
+planId: for modify only
+endTime: for renew only
 ```
 
 ### GET /usageapi/v1/orders/{orderId}
 
-get order
+1. 管理员查询任何一个订单详情。
+1. 当前用户查询自己帐户的一个订单详情。
 
-### GET /usageapi/v1/orders
+Path Parameters:
+```
+orderId: 订单号。
+```
 
-get orders
+Return Result:
+```
+code: 返回码
+msg: 返回信息
+data.order
+data.order.id
+```
 
+### GET /usageapi/v1/orders?account={accountId}
+
+1. 管理员查询任何帐户的订单列表。
+1. 当前用户查询自己帐户的订单列表。
+
+Query Parameters:
+```
+accountId: 被查询的帐户。不可省略。
+```
+
+Return Result:
+```
+code: 返回码
+msg: 返回信息
+data.total
+data.orders
+data.orders[0].id
+...
+```
 
 ## 数据库设计
 
 ```
 CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
-   ORDER_ID           VARCHAR(32) NOT NULL,
-   TYPE               TINYINT NOT NUL COMMENT 'prepay, postpay. etc',
-   USER               VARCHAR(120) NOT NULL,
-   SERVICE_ID         ,
-   QUANTITIES ,
-   PLAN_ID            ,
-   START_TIME         ,
-   END_TIME           ,
-   STATUS             ,
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   TYPE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL,
+   SERVICE_ID         VARCHAR(64) NOT NULL,
+   QUANTITIES         INT DEFAULT 1,
+   PLAN_ID            VARCHAR(64) NOT NULL,
+   START_TIME         DATETIME,
+   END_TIME           DATETIME,
+   CANCEL_TIME        DATETIME,
+   STATUS             TINYINT NOT NULL,
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 
-CREATE TABLE IF NOT EXISTS DF_USAGE_HISTORY
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
-   USAGE_ID           BIGINT NOT NULL AUTO_INCREMENT,
-   ORDER_ID           VARCHAR(32) NOT NULL,
-   ORDER_DETAILS      ,
-   PLAN_DETAILS       ,
-   START_TIME           ,
-   DURATION
-   CONSUMING          ,
-   PRIMARY KEY (USAGE_ID)
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   START_TIME         VARCHAR(20) NOT NULL,
+   DURATION           TINYINT NOT NULL,
+   CONSUMING          BIGINT NOT NULL,
+   PRIMARY KEY (USAGE_ID, START_TIME, DURATION)
 )  DEFAULT CHARSET=UTF8;
 ```
 
 ## 套餐在内存中的表示
 
-```
+```golang
 PlanPrice {
-    UniqueID
-    Money
-    Duration
-    StartTime
+    UniqueID  string
+    Money     float64
+    Duration  time.Duration
+    StartTime time.Time
 }
+
 Plan {
-    PlanID
-    Name
-    Info
+    PlanID string
+    Name   string
+    Info   string
     Prices []PlanPrice // sorted by StartTime
 }
 ```
