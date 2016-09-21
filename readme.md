@@ -5,33 +5,35 @@
 
 用户选择一个服务配置+一个套餐，生成一个订单，开启一个服务实例。一个订单对应一个服务实例。
 
+概念：
+* 订单计费步长: 消费阶梯递增时间单位。
+* 最短消费时间: 必须为消费步长的整数倍数。
+* 消费报表间隔: 目前支持天和月。
+
 订单对应的服务实例的配置和套餐可能更改。
 
 本模块不维护服务配置、套餐和服务实例信息。
  * 套餐模块需提供一个接口供本模块获取所有套餐信息。
  * 本模块将每隔数小时查询更新一次套餐信息。
- * 套餐的价格变动最好提前至少一个计费周期发布。
+ * 套餐的价格变动最好提前至少一个最小消费报表间隔（天）发布，
+   套餐的开始时间必须为一个最小消费报表间隔的开始时间。
 
 本模块负责消费报表（消费记录）的生成，即每个订单（服务实例）每个计费周期的消费额。
 
 本模块也将提供一个帐户消费速度查询接口。
 
-概念：
-* 订单计费步长: 消费阶梯递增时间单位。
-* 最短消费时间: 必须为消费步长的整数倍数。
-* 消费报表的时间间隔: 必须为消费步长的整数倍数，必须大于等于最短消费时间。
-
 ## APIs
 
-### GET /usageapi/v1/usages?order={orderId}&timestep={timeStep}&starttime={startTime}&endtime={endTime}
+### GET /usageapi/v1/usages?account={accountId}&order={orderId}&timestep={timeStep}&starttime={startTime}&endtime={endTime}
 
 1. 管理员查询任何订单的历史消费记录。
 1. 当前用户查询自己订单的历史消费记录。
 
 Query Parameters:
 ```
-orderId: 订单号。可省略，表示所有订单。
-timeStep: day|month，至少支持月，是否支持天视订单计费步长大小而定。
+accountId: 被查询的帐户。不可省略。
+orderId: 订单号。可省略，表示accountId的所有订单。
+timeStep: day|month。
 startTime: 开始时间
 endTime: 结束时间
 ```
@@ -85,6 +87,8 @@ usageDuration: 使用时长，只对预付费付费有效。
 ### PUT /usageapi/v1/orders/{orderId}
 
 管理员（修改一个服务实例的时候）修改一个订单。
+
+stop一个订单的时候，后付费订单的EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间。
 
 Path Parameters:
 ```
@@ -149,27 +153,43 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    PLAN_ID            VARCHAR(64) NOT NULL,
    START_TIME         DATETIME,
    END_TIME           DATETIME,
-   CANCEL_TIME        DATETIME,
-   STATUS             TINYINT NOT NULL,
+   LAST_CONSUME_TIME  DATETIME COMMENT 'for postpay only, also used as STOP_TIME',
+   STATUS             TINYINT NOT NULL COMMENT 'consuming, stopped, ended',
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 
-CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
-   START_TIME         VARCHAR(20) NOT NULL,
-   DURATION           TINYINT NOT NULL,
-   CONSUMING          BIGINT NOT NULL,
-   PRIMARY KEY (USAGE_ID, START_TIME, DURATION)
+   TIME_STEP          CHAR(1) NOT NULL COMMENT 'month, day, hour, etc',
+   START_TIME         VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
+   USAGE_DURATION     INT NOT NULL COMMENT 'in seconds', 
+   CONSUMING          BIGINT NOT NUL COMMENT 'scaled by 10000',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   PRIMARY KEY (ORDER_ID, TIME_STEP, START_TIME)
 )  DEFAULT CHARSET=UTF8;
 ```
+
+## 消费记录生成
+
+查找需要生成消费记录的订单: select * from DF_PURCHASE_ORDER where LAST_CONSUME_TIME<'%s'
+
+一个订单被修改的时候，将根据订单的老的属性立即产生一个消费记录。
+
+## 消费速度
+
+map[Account]map[Plan]int: 对每个帐户维护着一个每个套餐的数量的map。注意订单的QUANTITIES可能大于1。
+
+查找未被统计的新的订单: select * from DF_PURCHASE_ORDER where START_TIME>'%s'
+
+查找已经失效的订单: select * from DF_PURCHASE_ORDER where END_TIME<'%s'
 
 ## 套餐在内存中的表示
 
 ```golang
 PlanPrice {
     UniqueID  string
-    Money     float64
+    Money     float64 // consuming / quantity
     Duration  time.Duration
     StartTime time.Time
 }
