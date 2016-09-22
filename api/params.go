@@ -53,11 +53,12 @@ func Init(router *httprouter.Router) bool {
 }
 
 func initRouter(router *httprouter.Router) {
-	router.POST("/saasappapi/v1/apps", TimeoutHandle(500*time.Millisecond, CreateApp))
-	router.DELETE("/saasappapi/v1/apps/:id", TimeoutHandle(1500*time.Millisecond, DeleteApp))
-	router.PUT("/saasappapi/v1/apps/:id", TimeoutHandle(500*time.Millisecond, ModifyApp))
-	router.GET("/saasappapi/v1/apps/:id", TimeoutHandle(500*time.Millisecond, RetrieveApp))
-	router.GET("/saasappapi/v1/apps", TimeoutHandle(500*time.Millisecond, QueryAppList))
+	router.GET("/usageapi/v1/usages", TimeoutHandle(500*time.Millisecond, QueryAccountConsumingReports))
+	router.GET("/usageapi/v1/speed", TimeoutHandle(500*time.Millisecond, GetAccountConsumingSpeed))
+	router.POST("/usageapi/v1/orders", TimeoutHandle(500*time.Millisecond, CreateOrder))
+	router.PUT("/usageapi/v1/orders/{orderId}", TimeoutHandle(500*time.Millisecond, ModifyOrder))
+	router.GET("/usageapi/v1/orders/{orderId}", TimeoutHandle(500*time.Millisecond, GetAccountOrder))
+	router.GET("/usageapi/v1/orders", TimeoutHandle(500*time.Millisecond, QueryAccountOrders))
 }
 
 //=============================

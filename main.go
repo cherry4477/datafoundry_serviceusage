@@ -82,11 +82,6 @@ func NewRouter() *httprouter.Router {
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
 
-	router.POST("/saas/v1/apps", api.CreateApp)
-	router.DELETE("/saas/v1/apps/:appid", api.DeleteApp)
-	router.GET("/saas/v1/apps/:appid", api.RetrieveApp)
-	router.GET("/saas/v1/apps", api.QueryAppList)
-	router.PUT("/saas/v1/apps/:appid", api.ModifyApp)
 	router.NotFound = &HttpHandler{httpNotFound}
 	router.MethodNotAllowed = &HttpHandler{httpNotFound}
 	//router.Handler ("GET", "/static", http.StripPrefix ("/static/", http.FileServer (http.Dir ("public"))))

@@ -226,7 +226,77 @@ func canEditSaasApps(username string) bool {
 //
 //==================================================================
 
-func CreateApp(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+type GroupedReports struct {
+	Time    string                   `json:"time,omitempty"`
+	Reports []*usage.ConsumingReport `json:"reports,omitempty"`
+}
+
+func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedReports {
+	// todo
+
+	return []*GroupedReports {
+		{
+			Time: reports[0].Start_time,
+			Reports: reports,
+		},
+	}
+}
+
+func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	reports := []*usage.ConsumingReport {
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Time_step: usage.ReportStep_Day,
+			Start_time: "2016-05-29",
+			Usage_duration: int(24 * time.Hour / time.Second),
+			Money: 1.23,
+		},
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Time_step: usage.ReportStep_Day,
+			Start_time: "2016-05-28",
+			Usage_duration: int(24 * time.Hour / time.Second),
+			Money: 1.23,
+		},
+	}
+
+	groupedReports := groupReports(reports, usage.ReportStep_Day)
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, groupedReports))
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
+}
+
+type ConsumingSpeed struct {
+	Money    float64 `json:"money,omitempty"`
+	Duration int     `json:"duration,omitempty"`
+}
+
+func GetAccountConsumingSpeed(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	
+	speed := &ConsumingSpeed{
+		Money: 56.78,
+		Duration: usage.ReportStep_Day,
+	}
+
+	JsonResult(w, http.StatusOK, nil, speed)
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
+}
+
+//==================================================================
+// 
+//==================================================================
+
+func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
+
 	// ...
 
 	db := getDB()
@@ -277,48 +347,13 @@ func CreateApp(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 	JsonResult(w, http.StatusOK, nil, app.App_id)
 }
 
-func DeleteApp(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	// ...
+func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	db := getDB()
-	if db == nil {
-		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
-		return
-	}
+	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
 
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
-	if !canEditSaasApps(username) {
-		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
-		return
-	}
-
-	// ...
-
-	appId := params.ByName("id")
-
-	e = validateAppID(appId)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	err := usage.DeleteApp(db, appId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeDeleteApp, err.Error()), nil)
-		return
-	}
-
-	JsonResult(w, http.StatusOK, nil, nil)
-}
-
-func ModifyApp(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	// ...
 
 	db := getDB()
@@ -373,7 +408,27 @@ func ModifyApp(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 	JsonResult(w, http.StatusOK, nil, nil)
 }
 
-func RetrieveApp(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+	order := &usage.PurchaseOrder {
+		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Order_type: usage.OrderType_Postpay,
+		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Quantities: 1,
+		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+		End_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+		Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+		Status: usage.OrderStatus_Consuming,
+	}
+
+	JsonResult(w, http.StatusOK, nil, order)
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
+
+
 	//JsonResult(w, http.StatusOK, nil, appNewRelic)
 	//return
 	//
@@ -406,7 +461,40 @@ func RetrieveApp(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	JsonResult(w, http.StatusOK, nil, app)
 }
 
-func QueryAppList(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	orders := []*usage.PurchaseOrder {
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Order_type: usage.OrderType_Postpay,
+			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Quantities: 1,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+			End_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+			Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+			Status: usage.OrderStatus_Consuming,
+		},
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Order_type: usage.OrderType_Postpay,
+			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Service_Id: "8ADED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Quantities: 1,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
+			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
+			End_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
+			Last_consume_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
+			Status: usage.OrderStatus_Consuming,
+		},
+	}
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
+	
+	return
+	/////////////////////////////////////////////////////////////////////////////////
+	
+	
 	//apps := []*usage.SaasApp{
 	//	&appNewRelic,
 	//}

@@ -45,8 +45,8 @@ msg: 返回信息
 data.total
 data.results
 data.results[0].time
-data.results[0].orders
-data.results[0].orders[0].consuming
+data.results[0].reports
+data.results[0].reports[0].consuming
 ......
 ...
 ```
@@ -89,6 +89,8 @@ usageDuration: 使用时长，只对预付费付费有效。
 管理员（修改一个服务实例的时候）修改一个订单。
 
 stop一个订单的时候，后付费订单的EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间。
+
+修改订单的时候最好还是重新创建一个订单，以避免实现上的困难。
 
 Path Parameters:
 ```
@@ -161,11 +163,12 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
-   TIME_STEP          CHAR(1) NOT NULL COMMENT 'month, day, hour, etc',
+   TIME_STEP          TINYINT NOT NULL COMMENT 'prepayed, month, day, etc',
    START_TIME         VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
    USAGE_DURATION     INT NOT NULL COMMENT 'in seconds', 
    CONSUMING          BIGINT NOT NUL COMMENT 'scaled by 10000',
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'plan id at the report time',
    PRIMARY KEY (ORDER_ID, TIME_STEP, START_TIME)
 )  DEFAULT CHARSET=UTF8;
 ```
@@ -174,7 +177,10 @@ CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 
 查找需要生成消费记录的订单: select * from DF_PURCHASE_ORDER where LAST_CONSUME_TIME<'%s'
 
-一个订单被修改的时候，将根据订单的老的属性立即产生一个消费记录。
+一个订单被修改的时候，将根据订单的老的属性立即产生一个消费记录
+（从而一个时段的消费记录将分裂为多个。可以/推荐在修改订单的时候重新创建一个订单避免这种情况）。
+
+套餐价格变化最好在消费记录的分割点实施，以避免将一个时段的消费记录分裂为两个。
 
 ## 消费速度
 

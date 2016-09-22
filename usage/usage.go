@@ -17,6 +17,80 @@ import (
 //
 //=============================================================
 
+const (
+	OrderType_Prepay  = 0
+	OrderType_Postpay = 1
+)
+
+const (
+	OrderStatus_Consuming = 0
+	OrderStatus_Stopped   = 1
+	OrderStatus_Ended     = 2
+)
+
+const (
+	ReportStep_Prepayed = 0
+	ReportStep_Month    = 1
+	ReportStep_Day      = 2
+)
+
+type PurchaseOrder struct {
+	Order_id          string    `json:"orderId,omitempty"`
+	Order_type        int       `json:"type,omitempty"`
+	Account_id        string    `json:"accountId,omitempty"`
+	Service_Id        string    `json:"serviceId,omitempty"`
+	Quantities        int       `json:"quantities,omitempty"`
+	Plan_id           string    `json:"planId,omitempty"`
+	Start_time        time.Time `json:"startTime,omitempty"`
+	End_time          time.Time `json:"endTime,omitempty"`
+	Last_consume_time time.Time `json:"_,omitempty"`
+	Status            int       `json:"status,omitempty"`
+}
+
+type ConsumingReport struct {
+	Order_id          string    `json:"orderId,omitempty"`
+	Time_step         int       `json:"timeStep,omitempty"`
+	Start_time        string    `json:"startTime,omitempty"`
+	Usage_duration    int       `json:"usageDuration,omitempty"`
+	Consuming         int64     `json:"_,omitempty"`        
+	Money             float64   `json:"consuming,omitempty"` // vo, Money = Consuming * 0.0001
+	Account_id        string    `json:"_,omitempty"`
+	Plan_id           string    `json:"_,omitempty"`
+}
+
+/*
+CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
+(
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   TYPE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL,
+   SERVICE_ID         VARCHAR(64) NOT NULL,
+   QUANTITIES         INT DEFAULT 1,
+   PLAN_ID            VARCHAR(64) NOT NULL,
+   START_TIME         DATETIME,
+   END_TIME           DATETIME,
+   LAST_CONSUME_TIME  DATETIME COMMENT 'for postpay only, also used as STOP_TIME',
+   STATUS             TINYINT NOT NULL COMMENT 'consuming, stopped, ended',
+   PRIMARY KEY (ORDER_ID)
+)  DEFAULT CHARSET=UTF8;
+
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
+(
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   TIME_STEP          CHAR(1) NOT NULL COMMENT 'month, day, hour, etc',
+   START_TIME         VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
+   USAGE_DURATION     INT NOT NULL COMMENT 'in seconds', 
+   CONSUMING          BIGINT NOT NUL COMMENT 'scaled by 10000',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'plan id at the report time',
+   PRIMARY KEY (ORDER_ID, TIME_STEP, START_TIME)
+)  DEFAULT CHARSET=UTF8;
+*/
+
+//=============================================================
+//
+//=============================================================
+
 type SaasApp struct {
 	App_id      string    `json:"appId,omitempty"`
 	Provider    string    `json:"provider,omitempty"`
