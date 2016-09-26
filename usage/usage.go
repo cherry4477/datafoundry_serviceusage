@@ -38,20 +38,25 @@ type PurchaseOrder struct {
 	Order_id          string    `json:"orderId,omitempty"`
 	Order_type        int       `json:"type,omitempty"`
 	Account_id        string    `json:"accountId,omitempty"`
+	Region            string    `json:"region,omitempty"`
 	Service_Id        string    `json:"serviceId,omitempty"`
 	Quantities        int       `json:"quantities,omitempty"`
 	Plan_id           string    `json:"planId,omitempty"`
 	Start_time        time.Time `json:"startTime,omitempty"`
 	End_time          time.Time `json:"endTime,omitempty"`
 	Last_consume_time time.Time `json:"_,omitempty"`
+	Last_consume_id   int       `json:"_,omitempty"`
 	Status            int       `json:"status,omitempty"`
+	From_order_id     string    `json:"_,omitempty"`
 }
 
 type ConsumingReport struct {
 	Order_id          string    `json:"orderId,omitempty"`
-	Time_step         int       `json:"timeStep,omitempty"`
-	Start_time        string    `json:"startTime,omitempty"`
-	Usage_duration    int       `json:"usageDuration,omitempty"`
+	Consume_id        int       `json:"_,omitempty"`
+	Start_time        time.Time `json:"startTime,omitempty"`
+	Duration          int       `json:"duration,omitempty"`
+	Time_tag          string    `json:"_,omitempty"`
+	Step_tag          string    `json:"_,omitempty"`
 	Consuming         int64     `json:"_,omitempty"`        
 	Money             float64   `json:"consuming,omitempty"` // vo, Money = Consuming * 0.0001
 	Account_id        string    `json:"_,omitempty"`
@@ -59,32 +64,7 @@ type ConsumingReport struct {
 }
 
 /*
-CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
-(
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   TYPE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
-   ACCOUNT_ID         VARCHAR(64) NOT NULL,
-   SERVICE_ID         VARCHAR(64) NOT NULL,
-   QUANTITIES         INT DEFAULT 1,
-   PLAN_ID            VARCHAR(64) NOT NULL,
-   START_TIME         DATETIME,
-   END_TIME           DATETIME,
-   LAST_CONSUME_TIME  DATETIME COMMENT 'for postpay only, also used as STOP_TIME',
-   STATUS             TINYINT NOT NULL COMMENT 'consuming, stopped, ended',
-   PRIMARY KEY (ORDER_ID)
-)  DEFAULT CHARSET=UTF8;
 
-CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
-(
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   TIME_STEP          CHAR(1) NOT NULL COMMENT 'month, day, hour, etc',
-   START_TIME         VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
-   USAGE_DURATION     INT NOT NULL COMMENT 'in seconds', 
-   CONSUMING          BIGINT NOT NUL COMMENT 'scaled by 10000',
-   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
-   PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'plan id at the report time',
-   PRIMARY KEY (ORDER_ID, TIME_STEP, START_TIME)
-)  DEFAULT CHARSET=UTF8;
 */
 
 //=============================================================

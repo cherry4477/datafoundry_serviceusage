@@ -236,7 +236,7 @@ func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedRepo
 
 	return []*GroupedReports {
 		{
-			Time: reports[0].Start_time,
+			Time: reports[0].Time_tag,
 			Reports: reports,
 		},
 	}
@@ -246,16 +246,16 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 	reports := []*usage.ConsumingReport {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Time_step: usage.ReportStep_Day,
-			Start_time: "2016-05-29",
-			Usage_duration: int(24 * time.Hour / time.Second),
+			Start_time: time.Date(2016, time.May, 10, 24, 0, 0, 0, time.UTC),
+			Duration: int(24 * time.Hour / time.Second),
+			Time_tag: "2016-10-24",
 			Money: 1.23,
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Time_step: usage.ReportStep_Day,
-			Start_time: "2016-05-28",
-			Usage_duration: int(24 * time.Hour / time.Second),
+			Start_time: time.Date(2016, time.May, 10, 25, 0, 0, 0, time.UTC),
+			Duration: int(24 * time.Hour / time.Second),
+			Time_tag: "2016-10-25",
 			Money: 1.23,
 		},
 	}
@@ -472,7 +472,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			End_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			Status: usage.OrderStatus_Consuming,
 		},
 		{
@@ -484,7 +483,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
 			End_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
-			Last_consume_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
 			Status: usage.OrderStatus_Consuming,
 		},
 	}

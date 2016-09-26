@@ -140,6 +140,7 @@ data.total
 data.orders
 data.orders[0].id
 ...
+
 ```
 
 ## 数据库设计
@@ -150,28 +151,35 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    ORDER_ID           VARCHAR(64) NOT NULL,
    TYPE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
    ACCOUNT_ID         VARCHAR(64) NOT NULL,
+   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    SERVICE_ID         VARCHAR(64) NOT NULL,
    QUANTITIES         INT DEFAULT 1,
    PLAN_ID            VARCHAR(64) NOT NULL,
    START_TIME         DATETIME,
-   END_TIME           DATETIME,
+   END_TIME           DATETIME COMMENT '...',
    LAST_CONSUME_TIME  DATETIME COMMENT 'for postpay only, also used as STOP_TIME',
+   LAST_CONSUME_ID    INT,
    STATUS             TINYINT NOT NULL COMMENT 'consuming, stopped, ended',
+   FROM_ORDER_ID      VARCHAR(64) COMMENT 'order changes cause new order created',
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 (
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   TIME_STEP          TINYINT NOT NULL COMMENT 'prepayed, month, day, etc',
-   START_TIME         VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
-   USAGE_DURATION     INT NOT NULL COMMENT 'in seconds', 
-   CONSUMING          BIGINT NOT NUL COMMENT 'scaled by 10000',
+   ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
+   CONSUME_ID         INT,
+   START_TIME         DATETIME,
+   DURATION           INT NOT NULL COMMENT 'consuming time, in seconds', 
+   TIME_TAG           VARCHAR(16) NOT NULL COMMENT '2016-02, 2016-02-28, 2016-02-28-15, etc',
+   STEP_TAG           TINYINT NOT NULL COMMENT 'prepayed, mon
+   CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'plan id at the report time',
-   PRIMARY KEY (ORDER_ID, TIME_STEP, START_TIME)
+   PRIMARY KEY (ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
 ```
+
+
 
 ## 消费记录生成
 
