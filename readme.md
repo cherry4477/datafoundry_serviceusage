@@ -5,24 +5,126 @@
 
 用户选择一个服务配置+一个套餐，生成一个订单，开启一个服务实例。一个订单对应一个服务实例。
 
+## 预付费模式（当前采用的模式）
+
 概念：
-* 订单计费步长: 消费阶梯递增时间单位。
+* 订单终止时间: 服务已付费至日期。
+* 预警时长: 距订单终止时间前多长时间开始预警。
+* 可透支时长: 不支持。
+
+对于预付费模式，系统不会自动创建天/月扣费记录。
+
+## 后付费模式（目前未使用）
+
+概念：
+* 订单计费步长: 消费阶梯递增时间单位，推荐1小时。
+* 消费报表间隔: 推荐1天。
 * 最短消费时间: 必须为消费步长的整数倍数。
-* 消费报表间隔: 目前支持天和月。
+* 阶梯计价。
+* 时变套餐: 套餐中的服务数量或者大小随时间不断变化。
 
-订单对应的服务实例的配置和套餐可能更改。
+订单对应的服务实例的配置和套餐不可更改。若需更改，需创建一个新的订单。
 
-本模块不维护服务配置、套餐和服务实例信息。
+本模块不维护服务配置、套餐和服务实例信息。后付费模式需要缓存所有套餐信息。
  * 套餐模块需提供一个接口供本模块获取所有套餐信息。
  * 本模块将每隔数小时查询更新一次套餐信息。
  * 套餐的价格变动最好提前至少一个最小消费报表间隔（天）发布，
    套餐的开始时间必须为一个最小消费报表间隔的开始时间。
 
-本模块负责消费报表（消费记录）的生成，即每个订单（服务实例）每个计费周期的消费额。
+后付费模式下，本模块将负责消费报表（消费记录）的生成，即每个订单（服务实例）每个计费周期的消费额。
 
-本模块也将提供一个帐户消费速度查询接口。
+后付费模式下，在系统有效订单量不大的情况下(一万以下)，本模块也（可能）将提供一个帐户当前消费速度查询接口。
 
 ## APIs
+
+### POST /usageapi/v1/orders
+
+管理员（创建一个服务实例的时候）创建一个订单。
+
+Body Parameters (json):
+```
+orderId: 如果不提供，将自动生成一个uuid；如果提供，必须保证全局唯一性，而且必须包含至少一个冒号。
+mode: prepay | postpay
+accountId: 
+description: 对本订单的简短描述。
+serviceId: 或许不需要
+planId: 对于后付费，不能缺省。
+startTime: 对于后付费，可以缺省，表示当前时间。对于预付费，不可缺省。如果不缺省，格式为: "2006-01-02 15:04:05"
+endTime: 付费至时间，只对预付费付费有效。
+```
+
+Return Result:
+```
+orderId: 订单号。
+```
+
+### PUT /usageapi/v1/orders/{orderId}
+
+管理员（修改一个服务实例的时候）修改一个订单。
+
+如果订单号中不含冒号，修改订单的时候将终止老的订单并重新创建新的一个订单。
+
+对于后付费订单：
+* stop一个订单的时候，EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间。
+* modify一个订单的时候，将立即生成一个消费记录。
+
+Path Parameters:
+```
+orderId: 订单号。
+```
+
+Body Parameters (json):
+```
+action: end | changePlan | renew
+end: 结束订单，只对后付费有效
+planId: for changePlan only, 只对后付费有效
+endTime: for renew only， 只对预付费模式有效
+```
+
+Return Result:
+```
+orderId:  订单号。如果action==modify，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
+```
+
+### GET /usageapi/v1/orders/{orderId}
+
+1. 管理员查询任何一个订单详情。
+1. 当前用户查询自己帐户的一个订单详情。
+
+Path Parameters:
+```
+orderId: 订单号。
+```
+
+Return Result:
+```
+code: 返回码
+msg: 返回信息
+data.order
+data.order.id
+```
+
+### GET /usageapi/v1/orders?account={accountId}&status={status}
+
+1. 管理员查询任何帐户的订单列表。
+1. 当前用户查询自己帐户的订单列表。
+
+Query Parameters:
+```
+accountId: 被查询的帐户。不可省略。
+status: 订单状态。consuming|ended。可以缺省，表示所有订单。
+```
+
+Return Result:
+```
+code: 返回码
+msg: 返回信息
+data.total
+data.orders
+data.orders[0].id
+...
+
+```
 
 ### GET /usageapi/v1/usages?account={accountId}&order={orderId}&timestep={timeStep}&starttime={startTime}&endtime={endTime}
 
@@ -71,99 +173,29 @@ data.moeny
 data.duration
 ```
 
-### POST /usageapi/v1/orders
-
-管理员（创建一个服务实例的时候）创建一个订单。
-
-Body Parameters (json):
-```
-accountId
-serviceId
-planId
-startTime
-usageDuration: 使用时长，只对预付费付费有效。
-```
-
-### PUT /usageapi/v1/orders/{orderId}
-
-管理员（修改一个服务实例的时候）修改一个订单。
-
-stop一个订单的时候，后付费订单的EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间。
-
-修改订单的时候最好还是重新创建一个订单，以避免实现上的困难。
-
-Path Parameters:
-```
-orderId: 订单号。
-```
-
-Body Parameters (json):
-```
-action: stop | renew | modify
-planId: for modify only
-endTime: for renew only
-```
-
-### GET /usageapi/v1/orders/{orderId}
-
-1. 管理员查询任何一个订单详情。
-1. 当前用户查询自己帐户的一个订单详情。
-
-Path Parameters:
-```
-orderId: 订单号。
-```
-
-Return Result:
-```
-code: 返回码
-msg: 返回信息
-data.order
-data.order.id
-```
-
-### GET /usageapi/v1/orders?account={accountId}
-
-1. 管理员查询任何帐户的订单列表。
-1. 当前用户查询自己帐户的订单列表。
-
-Query Parameters:
-```
-accountId: 被查询的帐户。不可省略。
-```
-
-Return Result:
-```
-code: 返回码
-msg: 返回信息
-data.total
-data.orders
-data.orders[0].id
-...
-
-```
-
 ## 数据库设计
 
 ```
 CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
-   TYPE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
+   MODE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
    ACCOUNT_ID         VARCHAR(64) NOT NULL,
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    SERVICE_ID         VARCHAR(64) NOT NULL,
-   QUANTITIES         INT DEFAULT 1,
+   QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
    PLAN_ID            VARCHAR(64) NOT NULL,
    START_TIME         DATETIME,
-   END_TIME           DATETIME COMMENT '...',
-   LAST_CONSUME_TIME  DATETIME COMMENT 'for postpay only, also used as STOP_TIME',
-   LAST_CONSUME_ID    INT,
-   STATUS             TINYINT NOT NULL COMMENT 'consuming, stopped, ended',
-   FROM_ORDER_ID      VARCHAR(64) COMMENT 'order changes cause new order created',
+   END_TIME           DATETIME,
+   LAST_CONSUME_TIME  DATETIME COMMENT 'already payed to this time',
+   LAST_CONSUME_ID    INT COMMENT 'for report',
+   STATUS             TINYINT NOT NULL COMMENT 'consuming, ended, paused',
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
+```
 
+对后付费，消费报表:
+```
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 (
    ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
@@ -177,28 +209,31 @@ CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'plan id at the report time',
    PRIMARY KEY (ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
+
 ```
 
+## 消费记录生成（只对后付费有效）
 
-
-## 消费记录生成
-
-查找需要生成消费记录的订单: select * from DF_PURCHASE_ORDER where LAST_CONSUME_TIME<'%s'
+查找需要生成消费记录的订单: select * from DF_PURCHASE_ORDER where TYPE=postpay and LAST_CONSUME_TIME<'%s'
 
 一个订单被修改的时候，将根据订单的老的属性立即产生一个消费记录
-（从而一个时段的消费记录将分裂为多个。可以/推荐在修改订单的时候重新创建一个订单避免这种情况）。
+（从而一个时段的消费记录将分裂为多个。可以(推荐)在修改订单的时候重新创建一个订单避免这种情况）。
 
 套餐价格变化最好在消费记录的分割点实施，以避免将一个时段的消费记录分裂为两个。
 
-## 消费速度
+## 消费速度（只对后付费有效）
 
-map[Account]map[Plan]int: 对每个帐户维护着一个每个套餐的数量的map。注意订单的QUANTITIES可能大于1。
+假设没有时变套餐。
 
-查找未被统计的新的订单: select * from DF_PURCHASE_ORDER where START_TIME>'%s'
+AccountNumPlans = map[Account]map[Plan]int{}: 对每个帐户维护着一个每个套餐的数量的map。
+注意订单的QUANTITIES可能大于1。
 
-查找已经失效的订单: select * from DF_PURCHASE_ORDER where END_TIME<'%s'
+速度改变时机:
+* 套餐价格变化: 遍历AccountNumPlans
+* 产生了新的订单: select * from DF_PURCHASE_ORDER where START_TIME>'%s', 或许使用MQ更好
+* 有订单失效了: select * from DF_PURCHASE_ORDER where END_TIME<'%s', 或许使用MQ更好
 
-## 套餐在内存中的表示
+## 套餐在内存中的表示（只针对后付费）
 
 ```golang
 PlanPrice {
@@ -210,6 +245,7 @@ PlanPrice {
 
 Plan {
     PlanID string
+    Type   string
     Name   string
     Info   string
     Prices []PlanPrice // sorted by StartTime

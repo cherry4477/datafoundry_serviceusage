@@ -18,8 +18,8 @@ import (
 //=============================================================
 
 const (
-	OrderType_Prepay  = 0
-	OrderType_Postpay = 1
+	OrderMode_Prepay  = 0 // DON'T change!
+	OrderMode_Postpay = 1
 )
 
 const (
@@ -28,15 +28,9 @@ const (
 	OrderStatus_Ended     = 2
 )
 
-const (
-	ReportStep_Prepayed = 0
-	ReportStep_Month    = 1
-	ReportStep_Day      = 2
-)
-
 type PurchaseOrder struct {
 	Order_id          string    `json:"orderId,omitempty"`
-	Order_type        int       `json:"type,omitempty"`
+	Mode              int       `json:"mode,omitempty"`
 	Account_id        string    `json:"accountId,omitempty"`
 	Region            string    `json:"region,omitempty"`
 	Service_Id        string    `json:"serviceId,omitempty"`
@@ -46,9 +40,14 @@ type PurchaseOrder struct {
 	End_time          time.Time `json:"endTime,omitempty"`
 	Last_consume_time time.Time `json:"_,omitempty"`
 	Last_consume_id   int       `json:"_,omitempty"`
-	Status            int       `json:"status,omitempty"`
-	From_order_id     string    `json:"_,omitempty"`
+	Status            int        `json:"status,omitempty"`
 }
+
+const (
+	ReportStep_Prepayed = 0
+	ReportStep_Month    = 1
+	ReportStep_Day      = 2
+)
 
 type ConsumingReport struct {
 	Order_id          string    `json:"orderId,omitempty"`
@@ -64,8 +63,91 @@ type ConsumingReport struct {
 }
 
 /*
-
+CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
+(
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   MODE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL,
+   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   SERVICE_ID         VARCHAR(64) NOT NULL,
+   QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
+   PLAN_ID            VARCHAR(64) NOT NULL,
+   START_TIME         DATETIME,
+   END_TIME           DATETIME,
+   LAST_CONSUME_TIME  DATETIME COMMENT 'already payed to this time',
+   LAST_CONSUME_ID    INT COMMENT 'for report',
+   STATUS             TINYINT NOT NULL COMMENT 'consuming, ended, paused',
+   PRIMARY KEY (ORDER_ID)
+)  DEFAULT CHARSET=UTF8;
 */
+
+//=============================================================
+//
+//=============================================================
+
+func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
+	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
+	if err != nil {
+		return err
+	}
+	if order != nil {
+		return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
+	}
+
+	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
+	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
+	consumeTime := orderInfo.Last_consume_time.Format("2006-01-02 15:04:05.999999")
+	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
+				ORDER_ID, MODE, 
+				ACCOUNT_ID, REGION, SERVICE_ID, 
+				QUANTITIES, PLAN_ID,
+				START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
+				STATUS
+				) values (
+				?, ?,  
+				?, ?, ?, 
+				?, ?,
+				'%s', '%s', '%s', 0,
+				%d
+				)`, 
+				startTime, endTime, consumeTime,
+				OrderStatus_Consuming,
+				)
+	_, err = db.Exec(sqlstr,
+				orderInfo.Order_id, orderInfo.Mode, 
+				orderInfo.Account_id, orderInfo.Region, orderInfo.Service_Id, 
+				orderInfo.Quantities, orderInfo.Plan_id, 
+				)
+
+	return err
+}
+
+func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
+	timestr := renewToTime.Format("2006-01-02 15:04:05.999999")
+	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+				LAST_CONSUME_TIME='%s'
+				where APP_ID=?`, 
+				timestr,
+				)
+	result, err := db.Exec(sqlstr,
+				orderId,
+				)
+	
+	if err != nil {
+		return err
+	}
+
+	n, _ := result.RowsAffected()
+	if n < 1 {
+		return fmt.Errorf("order (%s) not found", orderId)
+	}
+
+	return nil
+}
+
+func RetrieveOrderByID(db *sql.DB, appId string) (*PurchaseOrder, error) {
+	return nil, nil
+}
 
 //=============================================================
 //

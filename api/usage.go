@@ -412,7 +412,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	order := &usage.PurchaseOrder {
 		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Order_type: usage.OrderType_Postpay,
+		Mode: usage.OrderMode_Postpay,
 		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 		Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 		Quantities: 1,
@@ -465,7 +465,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	orders := []*usage.PurchaseOrder {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Order_type: usage.OrderType_Postpay,
+			Mode: usage.OrderMode_Postpay,
 			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Quantities: 1,
@@ -476,7 +476,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Order_type: usage.OrderType_Postpay,
+			Mode: usage.OrderMode_Postpay,
 			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Service_Id: "8ADED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Quantities: 1,
