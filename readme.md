@@ -43,7 +43,6 @@
 
 Body Parameters (json):
 ```
-orderId: 如果不提供，将自动生成一个uuid；如果提供，必须保证全局唯一性，而且必须包含至少一个冒号。
 mode: prepay | postpay
 accountId: 
 description: 对本订单的简短描述。
@@ -62,11 +61,13 @@ orderId: 订单号。
 
 管理员（修改一个服务实例的时候）修改一个订单。
 
-如果订单号中不含冒号，修改订单的时候将终止老的订单并重新创建新的一个订单。
+对于预付费订单：
+* renew: 续费
+* end: 终止一个订单，订单状态将转为ended。
 
 对于后付费订单：
-* stop一个订单的时候，EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间。
-* modify一个订单的时候，将立即生成一个消费记录。
+* cancel: 取消订单，EndTime-StartTime将被确定为订单计费步长的整数倍，并且大于等于最短消费时间，订单状态将转为ending。
+* changePlan: 修改套餐，将立即使用老套餐生成一个消费记录。
 
 Path Parameters:
 ```
@@ -75,15 +76,14 @@ orderId: 订单号。
 
 Body Parameters (json):
 ```
-action: end | changePlan | renew
-end: 结束订单，只对后付费有效
-planId: for changePlan only, 只对后付费有效
-endTime: for renew only， 只对预付费模式有效
+action: cancel | changePlan | end | renew
+planId: for action==changePlan only, 只对后付费模式有效
+endTime: for action==renew only， 只对预付费模式有效
 ```
 
 Return Result:
 ```
-orderId:  订单号。如果action==modify，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
+orderId: 订单号。如果action==modify，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
 ```
 
 ### GET /usageapi/v1/orders/{orderId}
@@ -189,7 +189,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    END_TIME           DATETIME,
    LAST_CONSUME_TIME  DATETIME COMMENT 'already payed to this time',
    LAST_CONSUME_ID    INT COMMENT 'for report',
-   STATUS             TINYINT NOT NULL COMMENT 'consuming, ended, paused',
+   STATUS             TINYINT NOT NULL COMMENT 'consuming, ended, ending',
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 ```

@@ -12,7 +12,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
-	"github.com/asiainfoLDP/datahub_commons/common"
+	//"github.com/asiainfoLDP/datahub_commons/common"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
@@ -70,47 +70,6 @@ func genOrderID() string {
 //==================================================================
 //
 //==================================================================
-
-func validateAppInfo(app *usage.SaasApp) *Error {
-	var e *Error
-
-	app.Name, e = validateAppName(app.Name, true)
-	if e != nil {
-		return e
-	}
-
-	app.Version, e = validateAppVersion(app.Version, true)
-	if e != nil {
-		return e
-	}
-
-	app.Provider, e = validateAppProvider(app.Provider, true)
-	if e != nil {
-		return e
-	}
-
-	app.Category, e = validateAppCategory(app.Category, true)
-	if e != nil {
-		return e
-	}
-
-	app.Description, e = validateAppDescription(app.Description, true)
-	if e != nil {
-		return e
-	}
-
-	app.Url, e = validateUrl(app.Url, true, "url")
-	if e != nil {
-		return e
-	}
-
-	app.Icon_url, e = validateUrl(app.Icon_url, true, "iconUrl")
-	if e != nil {
-		return e
-	}
-
-	return nil
-}
 
 func validateAppID(appId string) *Error {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
@@ -295,56 +254,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
 	
 	return
-	/////////////////////////////////////////////////////////////////////////////////
-
-	// ...
-
-	db := getDB()
-	if db == nil {
-		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
-		return
-	}
-
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
-	if !canEditSaasApps(username) {
-		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
-		return
-	}
-
-	// ...
-
-	app := &usage.SaasApp{}
-	err := common.ParseRequestJsonInto(r, app)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
-		return
-	}
-
-	e = validateAppInfo(app)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-	
-	app.App_id = genUUID()
-	// followings will be ignored
-	//app.Create_time = time.Now()
-	//app.Hotness = 0
-
-	err = usage.CreateApp(db, app)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateApp, err.Error()), nil)
-		return
-	}
-
-	JsonResult(w, http.StatusOK, nil, app.App_id)
 }
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -352,60 +261,6 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
 	
 	return
-	/////////////////////////////////////////////////////////////////////////////////
-
-	// ...
-
-	db := getDB()
-	if db == nil {
-		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
-		return
-	}
-
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
-	if !canEditSaasApps(username) {
-		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
-		return
-	}
-
-	// ...
-
-	appId := params.ByName("id")
-
-	e = validateAppID(appId)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	app := &usage.SaasApp{}
-	err := common.ParseRequestJsonInto(r, app)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
-		return
-	}
-
-	e = validateAppInfo(app)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	err = usage.ModifyApp(db, app)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyApp, err.Error()), nil)
-		return
-	}
-
-
-	JsonResult(w, http.StatusOK, nil, nil)
 }
 
 func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -426,39 +281,6 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 	JsonResult(w, http.StatusOK, nil, order)
 	
 	return
-	/////////////////////////////////////////////////////////////////////////////////
-
-
-	//JsonResult(w, http.StatusOK, nil, appNewRelic)
-	//return
-	//
-	// todo: auth
-	
-	// ...
-
-	db := getDB()
-	if db == nil {
-		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
-		return
-	}
-
-	// ...
-
-	appId := params.ByName("id")
-
-	e := validateAppID(appId)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	app, err := usage.RetrieveAppByID(db, appId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetApp, err.Error()), nil)
-		return
-	}
-
-	JsonResult(w, http.StatusOK, nil, app)
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -490,51 +312,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
 	
 	return
-	/////////////////////////////////////////////////////////////////////////////////
-	
-	
-	//apps := []*usage.SaasApp{
-	//	&appNewRelic,
-	//}
-	//
-	//JsonResult(w, http.StatusOK, nil, newQueryListResult(int64(len(apps)), apps))
-	//return
-
-	// todo: auth
-	
-	// ...
-
-	db := getDB()
-	if db == nil {
-		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
-		return
-	}
-
-	r.ParseForm()
-
-	provider, e := validateAppProvider(r.Form.Get("provider"), false)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	category, e := validateAppCategory(r.Form.Get("category"), false)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-	
-	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
-	orderBy := usage.ValidateOrderBy(r.Form.Get("orderby"))
-	sortOrder := usage.ValidateSortOrder(r.Form.Get("sortorder"), false)
-
-	count, apps, err := usage.QueryApps(db, provider, category, orderBy, sortOrder, offset, size)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryApps, err.Error()), nil)
-		return
-	}
-
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, apps))
 }
 
 
