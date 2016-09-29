@@ -31,13 +31,15 @@ const (
 type PurchaseOrder struct {
 	Order_id          string    `json:"orderId,omitempty"`
 	Mode              int       `json:"mode,omitempty"`
+	Description       string    `json:"description,omitempty"`
 	Account_id        string    `json:"accountId,omitempty"`
 	Region            string    `json:"region,omitempty"`
 	Service_Id        string    `json:"serviceId,omitempty"`
 	Quantities        int       `json:"quantities,omitempty"`
 	Plan_id           string    `json:"planId,omitempty"`
 	Start_time        time.Time `json:"startTime,omitempty"`
-	End_time          time.Time `json:"endTime,omitempty"`
+	End_time          time.Time `json:"_,omitempty"` // po 
+	EndTime           *time.Time `json:"endTime,omitempty"` // vo
 	Last_consume_time time.Time `json:"_,omitempty"`
 	Last_consume_id   int       `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
@@ -98,13 +100,13 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
 	consumeTime := orderInfo.Last_consume_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
-				ORDER_ID, MODE, 
+				ORDER_ID, MODE, DESCRIPTION,
 				ACCOUNT_ID, REGION, SERVICE_ID, 
 				QUANTITIES, PLAN_ID,
 				START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
 				STATUS
 				) values (
-				?, ?,  
+				?, ?, ?, 
 				?, ?, ?, 
 				?, ?,
 				'%s', '%s', '%s', 0,
@@ -114,7 +116,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				OrderStatus_Consuming,
 				)
 	_, err = db.Exec(sqlstr,
-				orderInfo.Order_id, orderInfo.Mode, 
+				orderInfo.Order_id, orderInfo.Mode, orderInfo.Description, 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Service_Id, 
 				orderInfo.Quantities, orderInfo.Plan_id, 
 				)
@@ -331,7 +333,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 		offset_str = fmt.Sprintf("offset %d", offset)
 	}
 	sql_str := fmt.Sprintf(`select
-					ORDER_ID, MODE, 
+					ORDER_ID, MODE, DESCRIPTION, 
 					ACCOUNT_ID, REGION, SERVICE_ID, 
 					QUANTITIES, PLAN_ID,
 					START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
@@ -355,7 +357,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 	for rows.Next() {
 		order := &PurchaseOrder{}
 		err := rows.Scan(
-			&order.Order_id, &order.Mode,
+			&order.Order_id, &order.Mode, &order.Description, 
 			&order.Account_id, &order.Region, &order.Service_Id,
 			&order.Quantities, &order.Plan_id,
 			&order.Start_time, &order.End_time, &order.Last_consume_time, &order.Last_consume_id,

@@ -48,8 +48,8 @@ accountId:
 description: 对本订单的简短描述。
 serviceId: 或许不需要
 planId: 对于后付费，不能缺省。
-startTime: 对于后付费，可以缺省，表示当前时间。对于预付费，不可缺省。如果不缺省，格式为: "2006-01-02 15:04:05"
-endTime: 付费至时间，只对预付费付费有效。
+startTime: 对于后付费，可以缺省，表示当前时间。对于预付费，不可缺省。如果不缺省，格式为RFC3339。
+endTime: 付费至时间，只对预付费付费有效，格式为RFC3339。
 ```
 
 Return Result:
@@ -78,12 +78,12 @@ Body Parameters (json):
 ```
 action: cancel | changePlan | end | renew
 planId: for action==changePlan only, 只对后付费模式有效
-endTime: for action==renew only， 只对预付费模式有效
+endTime: for action==renew only， 只对预付费模式有效，格式为RFC3339。
 ```
 
 Return Result:
 ```
-orderId: 订单号。如果action==modify，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
+orderId: 订单号。如果action==changePlan，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
 ```
 
 ### GET /usageapi/v1/orders/{orderId}
@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
    MODE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
+   DESCRIPTION        VARCHAR(255),
    ACCOUNT_ID         VARCHAR(64) NOT NULL,
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    SERVICE_ID         VARCHAR(64) NOT NULL,

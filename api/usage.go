@@ -12,7 +12,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
-	//"github.com/asiainfoLDP/datahub_commons/common"
+	"github.com/asiainfoLDP/datahub_commons/common"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
@@ -71,13 +71,21 @@ func genOrderID() string {
 //
 //==================================================================
 
-func validateAppID(appId string) *Error {
+func validateOrderInfo(order *usage.PurchaseOrder) *Error {
+	return nil
+}
+
+//func validateOrderModification(orderMod *OrderModification) *Error {
+//	return nil
+//}
+
+func validateOrderID(appId string) *Error {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
 	_, e := _mustStringParam("appid", appId, 50, StringParamType_UrlWord)
 	return e
 }
 
-func validateAppName(name string, musBeNotBlank bool) (string, *Error) {
+func validateOrderName(name string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || name != "" {
 		// most 20 Chinese chars
 		name_param, e := _mustStringParam("name", name, 60, StringParamType_General)
@@ -90,7 +98,7 @@ func validateAppName(name string, musBeNotBlank bool) (string, *Error) {
 	return name, nil
 }
 
-func validateAppVersion(version string, musBeNotBlank bool) (string, *Error) {
+func validateOrderVersion(version string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || version != "" {
 		version_param, e := _mustStringParam("version", version, 32, StringParamType_General)
 		if e != nil {
@@ -102,7 +110,7 @@ func validateAppVersion(version string, musBeNotBlank bool) (string, *Error) {
 	return version, nil
 }
 
-func validateAppProvider(provider string, musBeNotBlank bool) (string, *Error) {
+func validateOrderProvider(provider string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || provider != "" {
 		// most 20 Chinese chars
 		provider_param, e := _mustStringParam("provider", provider, 60, StringParamType_General)
@@ -115,7 +123,7 @@ func validateAppProvider(provider string, musBeNotBlank bool) (string, *Error) {
 	return provider, nil
 }
 
-func validateAppCategory(category string, musBeNotBlank bool) (string, *Error) {
+func validateOrderCategory(category string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || category != "" {
 		// most 10 Chinese chars
 		category_param, e := _mustStringParam("category", category, 32, StringParamType_General)
@@ -128,7 +136,7 @@ func validateAppCategory(category string, musBeNotBlank bool) (string, *Error) {
 	return category, nil
 }
 
-func validateAppDescription(description string, musBeNotBlank bool) (string, *Error) {
+func validateOrderDescription(description string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || description != "" {
 		// most about 666 Chinese chars
 		description_param, e := _mustStringParam("description", description, 2000, StringParamType_General)
@@ -177,8 +185,217 @@ func validateAuth(token string) (string, *Error) {
 	return username, nil
 }
 
-func canEditSaasApps(username string) bool {
+func canManagePurchaseOrders(username string) bool {
 	return username == "admin"
+}
+
+//==================================================================
+// 
+//==================================================================
+
+func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	
+	return
+
+
+	// the real implementation
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	if !canManagePurchaseOrders(username) {
+		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
+		return
+	}
+
+	// ...
+
+	order := &usage.PurchaseOrder{}
+	err := common.ParseRequestJsonInto(r, order)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
+		return
+	}
+
+	e = validateOrderInfo(order)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+	
+	order.Order_id = genUUID()
+
+	err = usage.CreateOrder(db, order)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, err.Error()), nil)
+		return
+	}
+
+	JsonResult(w, http.StatusOK, nil, order.Order_id)
+}
+
+type OrderModification struct {
+	Action      string    `json:"action,omitempty"`
+	EndTime     string    `json:"endTime,omitempty"`
+}
+
+func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	
+	return
+
+
+	// the real implementation
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	if !canManagePurchaseOrders(username) {
+		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
+		return
+	}
+
+	// ...
+
+	orderId := params.ByName("id")
+
+	e = validateOrderID(orderId)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	orderMod := &OrderModification{}
+	err := common.ParseRequestJsonInto(r, orderMod)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
+		return
+	}
+
+	//e = validateOrderModification(orderMod)
+	//if e != nil {
+	//	JsonResult(w, http.StatusBadRequest, e, nil)
+	//	return
+	//}
+
+	switch orderMod.Action {
+	default: 
+		JsonResult(w, http.StatusBadRequest, newInvalidParameterError(fmt.Sprintf("unknown action: %s", orderMod.Action)), nil)
+		return
+	case "renew":
+		if orderMod.EndTime == "" {
+			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not specified"), nil)
+			return
+		}
+		
+		endTime, err := time.Parse(time.RFC3339, orderMod.EndTime)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not valid"), nil)
+			return
+		}
+
+		err = usage.RenewOrder(db, orderId, endTime)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
+			return
+		}
+
+	case "end":
+
+		err = usage.EndOrder(db, orderId)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
+			return
+		}
+
+	}
+
+	JsonResult(w, http.StatusOK, nil, nil)
+}
+
+func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+	order := &usage.PurchaseOrder {
+		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Mode: usage.OrderMode_Prepay,
+		Description: "mysql service broker",
+		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Quantities: 1,
+		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+		Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+		EndTime: nil,
+		Status: usage.OrderStatus_Consuming,
+	}
+
+	JsonResult(w, http.StatusOK, nil, order)
+	
+	return
+}
+
+func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	orders := []*usage.PurchaseOrder {
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Mode: usage.OrderMode_Prepay,
+			Description: "mysql service broker",
+			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Quantities: 1,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+			Last_consume_time: time.Date(2016, time.October, 10, 23, 0, 0, 0, time.UTC),
+			EndTime: nil,
+			Status: usage.OrderStatus_Consuming,
+		},
+		{
+			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Mode: usage.OrderMode_Prepay,
+			Description: "mysql service broker",
+			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Service_Id: "8ADED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Quantities: 1,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
+			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
+			Last_consume_time: time.Date(2016, time.October, 1, 23, 0, 0, 0, time.UTC),
+			EndTime: nil,
+			Status: usage.OrderStatus_Consuming,
+		},
+	}
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
+	
+	return
 }
 
 //==================================================================
@@ -243,75 +460,6 @@ func GetAccountConsumingSpeed(w http.ResponseWriter, r *http.Request, params htt
 	
 	return
 	/////////////////////////////////////////////////////////////////////////////////
-}
-
-//==================================================================
-// 
-//==================================================================
-
-func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
-	
-	return
-}
-
-func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
-	
-	return
-}
-
-func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-	order := &usage.PurchaseOrder {
-		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Mode: usage.OrderMode_Postpay,
-		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Quantities: 1,
-		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
-		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-		End_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-		Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-		Status: usage.OrderStatus_Consuming,
-	}
-
-	JsonResult(w, http.StatusOK, nil, order)
-	
-	return
-}
-
-func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	orders := []*usage.PurchaseOrder {
-		{
-			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Mode: usage.OrderMode_Postpay,
-			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Quantities: 1,
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			End_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Mode: usage.OrderMode_Postpay,
-			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Service_Id: "8ADED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Quantities: 1,
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
-			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
-			End_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
-			Status: usage.OrderStatus_Consuming,
-		},
-	}
-
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
-	
-	return
 }
 
 
