@@ -86,7 +86,7 @@ Return Result:
 orderId: 订单号。如果action==changePlan，可能和输入的订单号不同（老订单stopped，并创建一个新订单）。
 ```
 
-### GET /usageapi/v1/orders/{orderId}
+### GET /usageapi/v1/orders/{orderId}?account={accountId}
 
 1. 管理员查询任何一个订单详情。
 1. 当前用户查询自己帐户的一个订单详情。
@@ -94,6 +94,11 @@ orderId: 订单号。如果action==changePlan，可能和输入的订单号不�
 Path Parameters:
 ```
 orderId: 订单号。
+```
+
+Query Parameters:
+```
+accountId: 被查询的帐户。不可省略。
 ```
 
 Return Result:
@@ -104,7 +109,7 @@ data.order
 data.order.id
 ```
 
-### GET /usageapi/v1/orders?account={accountId}&status={status}
+### GET /usageapi/v1/orders?account={accountId}&status={status}&orderby={orderby}
 
 1. 管理员查询任何帐户的订单列表。
 1. 当前用户查询自己帐户的订单列表。
@@ -113,6 +118,10 @@ Query Parameters:
 ```
 accountId: 被查询的帐户。不可省略。
 status: 订单状态。consuming|ended。可以缺省，表示所有订单。
+orderby: 排序依据。可选。合法值包括hotness|createtime，默认为hotness。
+sortOrder: 排序方向。可选。合法值包括asc|desc，默认为desc。
+page: 第几页。可选。最小值为1。默认为1。
+size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
 
 Return Result:

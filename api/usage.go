@@ -5,9 +5,9 @@ import (
 	"time"
 	"crypto/rand"
 	"fmt"
-	"strings"
+	//"strings"
 	mathrand "math/rand"
-	neturl "net/url"
+	//neturl "net/url"
 	"encoding/base64"
 
 	"github.com/julienschmidt/httprouter"
@@ -79,12 +79,38 @@ func validateOrderInfo(order *usage.PurchaseOrder) *Error {
 //	return nil
 //}
 
-func validateOrderID(appId string) *Error {
+func validateOrderID(orderId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
-	_, e := _mustStringParam("appid", appId, 50, StringParamType_UrlWord)
-	return e
+	orderId, e := _mustStringParam("id", orderId, 50, StringParamType_UrlWord)
+	return orderId, e
 }
 
+func validateAccountID(accountId string) (string, *Error) {
+	// GetError2(ErrorCodeInvalidParameters, err.Error())
+	accountId, e := _mustStringParam("account", accountId, 50, StringParamType_UrlWord)
+	return accountId, e
+}
+
+func validateOrderStatus(statusName string) (int, *Error) {
+	var status = -1
+
+	switch statusName {
+	default:
+		return -1, newInvalidParameterError("invalid status parameter")
+	case "":
+		status = -1
+	case "consuming":
+		status = usage.OrderStatus_Consuming
+	case "ending":
+		status = usage.OrderStatus_Ending
+	case "ended":
+		status = usage.OrderStatus_Ended
+	}
+
+	return status, nil
+}
+
+/*
 func validateOrderName(name string, musBeNotBlank bool) (string, *Error) {
 	if musBeNotBlank || name != "" {
 		// most 20 Chinese chars
@@ -169,6 +195,7 @@ func validateUrl(url string, musBeNotBlank bool, paramName string) (string, *Err
 
 	return url, nil
 }
+*/
 
 // ...
 
@@ -286,9 +313,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	orderId := params.ByName("id")
-
-	e = validateOrderID(orderId)
+	orderId, e := validateOrderID(params.ByName("id"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -320,6 +345,11 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		endTime, err := time.Parse(time.RFC3339, orderMod.EndTime)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not valid"), nil)
+			return
+		}
+
+		if endTime.Before(time.Now()) {
+			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not valid."), nil)
 			return
 		}
 
@@ -361,6 +391,50 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 	JsonResult(w, http.StatusOK, nil, order)
 	
 	return
+
+
+	// the real implementation
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	accountId, e := validateAccountID(r.FormValue("account"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	// todo: check if username has the permission to view orders of accountId.
+	_, _ = username, accountId
+
+	// ...
+
+	orderId, e := validateOrderID(params.ByName("id"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	order, err := usage.RetrieveOrderByID(db, orderId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
+		return
+	}
+
+	JsonResult(w, http.StatusOK, nil, order)
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -396,6 +470,55 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
 	
 	return
+
+
+	// the real implementation
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	accountId, e := validateAccountID(r.FormValue("account"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	// todo: check if username has the permission to view orders of accountId.
+	_, _ = username, accountId
+
+	// ...
+
+	status, e := validateOrderStatus(r.FormValue("status"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+	
+	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
+	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
+	orderBy := r.FormValue("orderby")
+	sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
+
+	count, orders, err := usage.QueryOrders(db, accountId, status, orderBy, sortOrder, offset, size)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
+		return
+	}
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, orders))
 }
 
 //==================================================================
