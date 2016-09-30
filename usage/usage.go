@@ -19,36 +19,34 @@ import (
 
 const (
 	OrderMode_Prepay  = 0 // DON'T change!
-	OrderMode_Postpay = 1
+	OrderMode_Postpay = 1 // DON'T change!
 )
 
 const (
-	OrderStatus_Consuming = 0
-	OrderStatus_Ending    = 1
-	OrderStatus_Ended     = 2
+	OrderStatus_Consuming = 0 // DON'T change!
+	OrderStatus_Ending    = 1 // DON'T change!
+	OrderStatus_Ended     = 2 // DON'T change!
 )
 
 type PurchaseOrder struct {
-	Order_id          string    `json:"orderId,omitempty"`
-	Mode              int       `json:"mode,omitempty"`
-	Description       string    `json:"description,omitempty"`
-	Account_id        string    `json:"accountId,omitempty"`
-	Region            string    `json:"region,omitempty"`
-	Service_Id        string    `json:"serviceId,omitempty"`
-	Quantities        int       `json:"quantities,omitempty"`
-	Plan_id           string    `json:"planId,omitempty"`
-	Start_time        time.Time `json:"startTime,omitempty"`
-	End_time          time.Time `json:"_,omitempty"` // po 
+	Order_id          string     `json:"orderId,omitempty"`
+	Mode              int        `json:"mode,omitempty"`
+	Account_id        string     `json:"accountId,omitempty"`
+	Region            string     `json:"region,omitempty"`
+	Quantities        int        `json:"quantities,omitempty"`
+	Plan_id           string     `json:"planId,omitempty"`
+	Start_time        time.Time  `json:"startTime,omitempty"`
+	End_time          time.Time  `json:"_,omitempty"` // po 
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
-	Last_consume_time time.Time `json:"_,omitempty"`
-	Last_consume_id   int       `json:"_,omitempty"`
+	Last_consume_time time.Time  `json:"_,omitempty"`
+	Last_consume_id   int        `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
 }
 
 const (
-	ReportStep_Prepayed = 0
-	ReportStep_Month    = 1
-	ReportStep_Day      = 2
+	ReportStep_Prepayed = 0 // DON'T change!
+	ReportStep_Month    = 1 // DON'T change!
+	ReportStep_Day      = 2 // DON'T change!
 )
 
 type ConsumingReport struct {
@@ -100,14 +98,14 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
 	consumeTime := orderInfo.Last_consume_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
-				ORDER_ID, MODE, DESCRIPTION,
-				ACCOUNT_ID, REGION, SERVICE_ID, 
+				ORDER_ID, MODE,
+				ACCOUNT_ID, REGION, 
 				QUANTITIES, PLAN_ID,
 				START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
 				STATUS
 				) values (
-				?, ?, ?, 
-				?, ?, ?, 
+				?, ?, 
+				?, ?, 
 				?, ?,
 				'%s', '%s', '%s', 0,
 				%d
@@ -116,8 +114,8 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				OrderStatus_Consuming,
 				)
 	_, err = db.Exec(sqlstr,
-				orderInfo.Order_id, orderInfo.Mode, orderInfo.Description, 
-				orderInfo.Account_id, orderInfo.Region, orderInfo.Service_Id, 
+				orderInfo.Order_id, orderInfo.Mode,  
+				orderInfo.Account_id, orderInfo.Region,  
 				orderInfo.Quantities, orderInfo.Plan_id, 
 				)
 
@@ -333,8 +331,8 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 		offset_str = fmt.Sprintf("offset %d", offset)
 	}
 	sql_str := fmt.Sprintf(`select
-					ORDER_ID, MODE, DESCRIPTION, 
-					ACCOUNT_ID, REGION, SERVICE_ID, 
+					ORDER_ID, MODE, 
+					ACCOUNT_ID, REGION, 
 					QUANTITIES, PLAN_ID,
 					START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
 					STATUS
@@ -357,8 +355,8 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 	for rows.Next() {
 		order := &PurchaseOrder{}
 		err := rows.Scan(
-			&order.Order_id, &order.Mode, &order.Description, 
-			&order.Account_id, &order.Region, &order.Service_Id,
+			&order.Order_id, &order.Mode, 
+			&order.Account_id, &order.Region, 
 			&order.Quantities, &order.Plan_id,
 			&order.Start_time, &order.End_time, &order.Last_consume_time, &order.Last_consume_id,
 			&order.Status, 

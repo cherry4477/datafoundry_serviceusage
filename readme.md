@@ -45,11 +45,8 @@ Body Parameters (json):
 ```
 mode: prepay | postpay
 accountId: 
-description: 对本订单的简短描述。
-serviceId: 或许不需要
-planId: 对于后付费，不能缺省。
-startTime: 对于后付费，可以缺省，表示当前时间。对于预付费，不可缺省。如果不缺省，格式为RFC3339。
-endTime: 付费至时间，只对预付费付费有效，格式为RFC3339。
+planId: 
+duration: 这是一个整数。
 ```
 
 Return Result:
@@ -189,10 +186,8 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
    MODE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
-   DESCRIPTION        VARCHAR(255),
    ACCOUNT_ID         VARCHAR(64) NOT NULL,
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
-   SERVICE_ID         VARCHAR(64) NOT NULL,
    QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
    PLAN_ID            VARCHAR(64) NOT NULL,
    START_TIME         DATETIME,

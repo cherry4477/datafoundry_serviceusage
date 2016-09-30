@@ -71,13 +71,16 @@ func genOrderID() string {
 //
 //==================================================================
 
-func validateOrderInfo(order *usage.PurchaseOrder) *Error {
-	return nil
+func validateOrderMode(modeName string) (int, *Error) {
+	switch modeName {
+	case "prepay":
+		return usage.OrderMode_Prepay, nil
+	case "postpay":
+		return usage.OrderMode_Postpay, nil
+	}
+	
+	return -1, newInvalidParameterError("invalid mode parameter")
 }
-
-//func validateOrderModification(orderMod *OrderModification) *Error {
-//	return nil
-//}
 
 func validateOrderID(orderId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
@@ -87,8 +90,14 @@ func validateOrderID(orderId string) (string, *Error) {
 
 func validateAccountID(accountId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
-	accountId, e := _mustStringParam("account", accountId, 50, StringParamType_UrlWord)
+	accountId, e := _mustStringParam("accountId", accountId, 50, StringParamType_UrlWord)
 	return accountId, e
+}
+
+func validatePlanID(planId string) (string, *Error) {
+	// GetError2(ErrorCodeInvalidParameters, err.Error())
+	planId, e := _mustStringParam("planId", planId, 50, StringParamType_UrlWord)
+	return planId, e
 }
 
 func validateOrderStatus(statusName string) (int, *Error) {
@@ -220,6 +229,13 @@ func canManagePurchaseOrders(username string) bool {
 // 
 //==================================================================
 
+type OrderCreation struct {
+	Mode      string    `json:"mode,omitempty"`
+	AccountID string    `json:"accountId,omitempty"`
+	PlanID    string    `json:"planId,omitempty"`
+	Duration  string    `json:"duration,omitempty"`
+}
+
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
 	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
@@ -252,20 +268,43 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	order := &usage.PurchaseOrder{}
-	err := common.ParseRequestJsonInto(r, order)
+	orderCreation := &OrderCreation{}
+	err := common.ParseRequestJsonInto(r, orderCreation)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
 		return
 	}
 
-	e = validateOrderInfo(order)
+	orderMode, e := validateOrderMode(orderCreation.Mode)
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
 	}
-	
-	order.Order_id = genUUID()
+
+	accountId, e := validateAccountID(orderCreation.AccountID)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	planId, e := validatePlanID(orderCreation.PlanID)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	// todo: remote get plan
+
+	// todo: remote make payment
+
+	// ...
+
+	order := &usage.PurchaseOrder{
+		Order_id: genUUID(),
+		Mode: orderMode,
+		Account_id: accountId,
+		Plan_id : planId,
+	}
 
 	err = usage.CreateOrder(db, order)
 	if err != nil {
@@ -334,9 +373,12 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	switch orderMod.Action {
 	default: 
+
 		JsonResult(w, http.StatusBadRequest, newInvalidParameterError(fmt.Sprintf("unknown action: %s", orderMod.Action)), nil)
 		return
+
 	case "renew":
+
 		if orderMod.EndTime == "" {
 			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not specified"), nil)
 			return
@@ -377,9 +419,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 	order := &usage.PurchaseOrder {
 		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 		Mode: usage.OrderMode_Prepay,
-		Description: "mysql service broker",
 		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 		Quantities: 1,
 		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
@@ -442,9 +482,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Mode: usage.OrderMode_Prepay,
-			Description: "mysql service broker",
 			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Service_Id: "89DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
@@ -455,9 +493,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
 			Mode: usage.OrderMode_Prepay,
-			Description: "mysql service broker",
 			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Service_Id: "8ADED98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
