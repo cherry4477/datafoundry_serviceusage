@@ -71,6 +71,7 @@ func genOrderID() string {
 //
 //==================================================================
 
+/*
 func validateOrderMode(modeName string) (int, *Error) {
 	switch modeName {
 	case "prepay":
@@ -81,6 +82,7 @@ func validateOrderMode(modeName string) (int, *Error) {
 	
 	return -1, newInvalidParameterError("invalid mode parameter")
 }
+*/
 
 func validateOrderID(orderId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
@@ -230,10 +232,8 @@ func canManagePurchaseOrders(username string) bool {
 //==================================================================
 
 type OrderCreation struct {
-	Mode      string    `json:"mode,omitempty"`
 	AccountID string    `json:"accountId,omitempty"`
 	PlanID    string    `json:"planId,omitempty"`
-	Duration  string    `json:"duration,omitempty"`
 }
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -241,7 +241,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
 	
 	return
-
 
 	// the real implementation
 
@@ -275,17 +274,19 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	orderMode, e := validateOrderMode(orderCreation.Mode)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
+	//orderMode, e := validateOrderMode(orderCreation.Mode)
+	//if e != nil {
+	//	JsonResult(w, http.StatusBadRequest, e, nil)
+	//	return
+	//}
 
 	accountId, e := validateAccountID(orderCreation.AccountID)
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
 	}
+
+	// todo: valid username accountId relation
 
 	planId, e := validatePlanID(orderCreation.PlanID)
 	if e != nil {
@@ -295,15 +296,29 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// todo: remote get plan
 
-	// todo: remote make payment
+	planId = planId 
+	planType := "unknown"
+	planRegion := "unknown"
 
 	// ...
+	now := time.Now()
+	startTime := now
+	endTime := now
+	nextConsumeTime := now
 
 	order := &usage.PurchaseOrder{
 		Order_id: genUUID(),
-		Mode: orderMode,
 		Account_id: accountId,
+
 		Plan_id : planId,
+		Plan_type: planType,
+		Region: planRegion,
+
+		Start_time: startTime,
+		End_time: endTime,
+		Next_consume_time: nextConsumeTime,
+
+		Status: usage.OrderStatus_Pending,
 	}
 
 	err = usage.CreateOrder(db, order)
@@ -312,17 +327,21 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
+	// todo: remote make payment
+	// todo: change order status => consuming
+	// todo: create a consuming report
+
 	JsonResult(w, http.StatusOK, nil, order.Order_id)
 }
 
 type OrderModification struct {
 	Action      string    `json:"action,omitempty"`
-	EndTime     string    `json:"endTime,omitempty"`
+	AccountID string    `json:"accountId,omitempty"`
 }
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	JsonResult(w, http.StatusOK, nil, nil)
 	
 	return
 
@@ -365,11 +384,13 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	//e = validateOrderModification(orderMod)
-	//if e != nil {
-	//	JsonResult(w, http.StatusBadRequest, e, nil)
-	//	return
-	//}
+	accountId, e := validateAccountID(orderMod.AccountID)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	// todo: validate username accountId relation
 
 	switch orderMod.Action {
 	default: 
@@ -377,33 +398,11 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		JsonResult(w, http.StatusBadRequest, newInvalidParameterError(fmt.Sprintf("unknown action: %s", orderMod.Action)), nil)
 		return
 
-	case "renew":
+	case "cancel":
 
-		if orderMod.EndTime == "" {
-			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not specified"), nil)
-			return
-		}
-		
-		endTime, err := time.Parse(time.RFC3339, orderMod.EndTime)
-		if err != nil {
-			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not valid"), nil)
-			return
-		}
+		// todo: different plan types may need different handlings
 
-		if endTime.Before(time.Now()) {
-			JsonResult(w, http.StatusBadRequest, newInvalidParameterError("endTime is not valid."), nil)
-			return
-		}
-
-		err = usage.RenewOrder(db, orderId, endTime)
-		if err != nil {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
-			return
-		}
-
-	case "end":
-
-		err = usage.EndOrder(db, orderId)
+		err = usage.EndOrder(db, orderId, accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
 			return
@@ -418,12 +417,11 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	order := &usage.PurchaseOrder {
 		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Mode: usage.OrderMode_Prepay,
 		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Region: "bj",
 		Quantities: 1,
 		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-		Last_consume_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 		EndTime: nil,
 		Status: usage.OrderStatus_Consuming,
 	}
@@ -481,23 +479,21 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	orders := []*usage.PurchaseOrder {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Mode: usage.OrderMode_Prepay,
 			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Region: "bj",
 			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			Last_consume_time: time.Date(2016, time.October, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
 			Status: usage.OrderStatus_Consuming,
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Mode: usage.OrderMode_Prepay,
-			Account_id: "78DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Region: "bj",
 			Quantities: 1,
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
-			Start_time: time.Date(2016, time.May, 1, 23, 0, 0, 0, time.UTC),
-			Last_consume_time: time.Date(2016, time.October, 1, 23, 0, 0, 0, time.UTC),
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
 			Status: usage.OrderStatus_Consuming,
 		},
@@ -561,6 +557,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 //
 //==================================================================
 
+/*
 type GroupedReports struct {
 	Time    string                   `json:"time,omitempty"`
 	Reports []*usage.ConsumingReport `json:"reports,omitempty"`
@@ -576,33 +573,31 @@ func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedRepo
 		},
 	}
 }
+*/
 
 func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	reports := []*usage.ConsumingReport {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Start_time: time.Date(2016, time.May, 10, 24, 0, 0, 0, time.UTC),
-			Duration: int(24 * time.Hour / time.Second),
-			Time_tag: "2016-10-24",
+			Consume_time: time.Date(2016, time.May, 10, 24, 0, 0, 0, time.UTC),
 			Money: 1.23,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Start_time: time.Date(2016, time.May, 10, 25, 0, 0, 0, time.UTC),
-			Duration: int(24 * time.Hour / time.Second),
-			Time_tag: "2016-10-25",
+			Consume_time: time.Date(2016, time.May, 10, 25, 0, 0, 0, time.UTC),
 			Money: 1.23,
+			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 		},
 	}
 
-	groupedReports := groupReports(reports, usage.ReportStep_Day)
-
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, groupedReports))
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, reports))
 	
 	return
 	/////////////////////////////////////////////////////////////////////////////////
 }
 
+/*
 type ConsumingSpeed struct {
 	Money    float64 `json:"money,omitempty"`
 	Duration int     `json:"duration,omitempty"`
@@ -620,6 +615,7 @@ func GetAccountConsumingSpeed(w http.ResponseWriter, r *http.Request, params htt
 	return
 	/////////////////////////////////////////////////////////////////////////////////
 }
+*/
 
 
 

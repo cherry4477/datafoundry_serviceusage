@@ -18,67 +18,48 @@ import (
 //=============================================================
 
 const (
-	OrderMode_Prepay  = 0 // DON'T change!
-	OrderMode_Postpay = 1 // DON'T change!
-)
-
-const (
-	OrderStatus_Consuming = 0 // DON'T change!
-	OrderStatus_Ending    = 1 // DON'T change!
-	OrderStatus_Ended     = 2 // DON'T change!
+	OrderStatus_Pending   = 0 // DON'T change!
+	OrderStatus_Consuming = 5 // DON'T change!
+	OrderStatus_Ending    = 10 // DON'T change!
+	OrderStatus_Ended     = 15 // DON'T change!
 )
 
 type PurchaseOrder struct {
 	Order_id          string     `json:"orderId,omitempty"`
-	Mode              int        `json:"mode,omitempty"`
 	Account_id        string     `json:"accountId,omitempty"`
 	Region            string     `json:"region,omitempty"`
 	Quantities        int        `json:"quantities,omitempty"`
 	Plan_id           string     `json:"planId,omitempty"`
+	Plan_type         string     `json:"_,omitempty"`
 	Start_time        time.Time  `json:"startTime,omitempty"`
 	End_time          time.Time  `json:"_,omitempty"` // po 
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
-	Last_consume_time time.Time  `json:"_,omitempty"`
+	Next_consume_time time.Time  `json:"_,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
 }
 
-const (
-	ReportStep_Prepayed = 0 // DON'T change!
-	ReportStep_Month    = 1 // DON'T change!
-	ReportStep_Day      = 2 // DON'T change!
-)
-
 type ConsumingReport struct {
 	Order_id          string    `json:"orderId,omitempty"`
 	Consume_id        int       `json:"_,omitempty"`
-	Start_time        time.Time `json:"startTime,omitempty"`
-	Duration          int       `json:"duration,omitempty"`
-	Time_tag          string    `json:"_,omitempty"`
-	Step_tag          string    `json:"_,omitempty"`
-	Consuming         int64     `json:"_,omitempty"`        
-	Money             float64   `json:"consuming,omitempty"` // vo, Money = Consuming * 0.0001
+	Consume_time      time.Time `json:"time,omitempty"`
+	Consuming         int64     `json:"_,omitempty"`         // po
+	Money             float64   `json:"money,omitempty"` // vo, Money = Consuming * 0.0001
 	Account_id        string    `json:"_,omitempty"`
-	Plan_id           string    `json:"_,omitempty"`
+	Plan_id           string    `json:"planId,omitempty"`
 }
 
 /*
-CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
 (
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   MODE               TINYINT NOT NULL COMMENT 'prepay, postpay. etc',
-   ACCOUNT_ID         VARCHAR(64) NOT NULL,
-   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
-   SERVICE_ID         VARCHAR(64) NOT NULL,
-   QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
-   PLAN_ID            VARCHAR(64) NOT NULL,
-   START_TIME         DATETIME,
-   END_TIME           DATETIME,
-   LAST_CONSUME_TIME  DATETIME COMMENT 'already payed to this time',
-   LAST_CONSUME_ID    INT COMMENT 'for report',
-   STATUS             TINYINT NOT NULL COMMENT 'consuming, ended, paused',
-   PRIMARY KEY (ORDER_ID)
+   ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
+   CONSUME_ID         INT,
+   CONSUME_TIME       DATETIME,
+   CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   PRIMARY KEY (ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
+
 */
 
 //=============================================================
@@ -96,32 +77,33 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 
 	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
-	consumeTime := orderInfo.Last_consume_time.Format("2006-01-02 15:04:05.999999")
+	consumeTime := orderInfo.Next_consume_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
-				ORDER_ID, MODE,
+				ORDER_ID,
 				ACCOUNT_ID, REGION, 
-				QUANTITIES, PLAN_ID,
-				START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
+				QUANTITIES, PLAN_ID, PLAN_TYPE, 
+				START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
 				STATUS
 				) values (
+				?, 
 				?, ?, 
-				?, ?, 
-				?, ?,
+				?, ?, ?, 
 				'%s', '%s', '%s', 0,
-				%d
+				?
 				)`, 
 				startTime, endTime, consumeTime,
-				OrderStatus_Consuming,
 				)
 	_, err = db.Exec(sqlstr,
-				orderInfo.Order_id, orderInfo.Mode,  
+				orderInfo.Order_id, 
 				orderInfo.Account_id, orderInfo.Region,  
-				orderInfo.Quantities, orderInfo.Plan_id, 
+				orderInfo.Quantities, orderInfo.Plan_id, orderInfo.Plan_type, 
+				orderInfo.Status,  
 				)
 
 	return err
 }
 
+/*
 func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
 	order, err := RetrieveOrderByID(db, orderId)
 	if err != nil {
@@ -134,11 +116,11 @@ func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
 		return fmt.Errorf("order (id=%s) not in consuming status", orderId)
 	}
 
-	// todo: renewToTime should be larger than LAST_CONSUME_TIME
+	// todo: renewToTime should be larger than NEXT_CONSUME_TIME
 
 	timestr := renewToTime.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				LAST_CONSUME_TIME='%s'
+				NEXT_CONSUME_TIME='%s'
 				where ORDER_ID=?`, 
 				timestr,
 				)
@@ -157,8 +139,9 @@ func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
 
 	return nil
 }
+*/
 
-func EndOrder(db *sql.DB, orderId string) error {
+func EndOrder(db *sql.DB, orderId string, accountId string) error {
 	order, err := RetrieveOrderByID(db, orderId)
 	if err != nil {
 		return err
@@ -166,13 +149,17 @@ func EndOrder(db *sql.DB, orderId string) error {
 	if order != nil {
 		return fmt.Errorf("order (id=%s) already existed", orderId)
 	}
-	if order.Status == OrderStatus_Ended {
+	if order.Account_id != accountId {
+		return fmt.Errorf("account id of order (id=%s) and input account id (%s) not match", orderId, accountId)
+	}
+	if order.Status == OrderStatus_Ending || order.Status == OrderStatus_Ended {
 		return fmt.Errorf("order (id=%s) already ended", orderId)
 	}
 
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 				STATUS=%d
-				where ORDER_ID=?`, 
+				where 
+				ORDER_ID=?`, 
 				OrderStatus_Ended,
 				)
 	result, err := db.Exec(sqlstr,
@@ -237,13 +224,14 @@ func QueryOrders(db *sql.DB, accountId string, status int, orderBy string, sortO
 	// ...
 	
 	switch strings.ToLower(orderBy) {
+	case "consumetime":
+		orderBy = "NEXT_CONSUME_TIME"
+	case "endtime":
+		orderBy = "END_TIME"
+	// case "starttime":
 	default:
 		orderBy = "START_TIME"
 		sortOrder = false
-	case "consumetime":
-		orderBy = "LAST_CONSUME_TIME"
-	case "endtime":
-		orderBy = "END_TIME"
 	}
 
 	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrderText[sortOrder])
@@ -331,10 +319,10 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 		offset_str = fmt.Sprintf("offset %d", offset)
 	}
 	sql_str := fmt.Sprintf(`select
-					ORDER_ID, MODE, 
+					ORDER_ID, 
 					ACCOUNT_ID, REGION, 
-					QUANTITIES, PLAN_ID,
-					START_TIME, END_TIME, LAST_CONSUME_TIME, LAST_CONSUME_ID, 
+					QUANTITIES, PLAN_ID, PLAN_TYPE,
+					START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
 					STATUS
 					from DF_PURCHASE_ORDER
 					%s
@@ -355,10 +343,10 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 	for rows.Next() {
 		order := &PurchaseOrder{}
 		err := rows.Scan(
-			&order.Order_id, &order.Mode, 
+			&order.Order_id, 
 			&order.Account_id, &order.Region, 
-			&order.Quantities, &order.Plan_id,
-			&order.Start_time, &order.End_time, &order.Last_consume_time, &order.Last_consume_id,
+			&order.Quantities, &order.Plan_id, &order.Plan_type, 
+			&order.Start_time, &order.End_time, &order.Next_consume_time, &order.Last_consume_id,
 			&order.Status, 
 		)
 		if err != nil {
