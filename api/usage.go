@@ -110,6 +110,8 @@ func validateOrderStatus(statusName string) (int, *Error) {
 		return -1, newInvalidParameterError("invalid status parameter")
 	case "":
 		status = -1
+	case "pending":
+		status = usage.OrderStatus_Pending
 	case "consuming":
 		status = usage.OrderStatus_Consuming
 	case "ending":
@@ -541,10 +543,9 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	
 	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
-	orderBy := r.FormValue("orderby")
-	sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
+	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-	count, orders, err := usage.QueryOrders(db, accountId, status, orderBy, sortOrder, offset, size)
+	count, orders, err := usage.QueryOrders(db, accountId, status, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return

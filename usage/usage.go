@@ -199,7 +199,7 @@ func getSingleOrder(db *sql.DB, sqlWhere string) (*PurchaseOrder, error) {
 	return orders[0], nil
 }
 
-func QueryOrders(db *sql.DB, accountId string, status int, orderBy string, sortOrder bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
+func QueryOrders(db *sql.DB, accountId string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
@@ -222,19 +222,24 @@ func QueryOrders(db *sql.DB, accountId string, status int, orderBy string, sortO
 	}
 
 	// ...
+
+
+	orderBy, sortOrder := "", ""
 	
 	switch strings.ToLower(orderBy) {
 	case "consumetime":
 		orderBy = "NEXT_CONSUME_TIME"
+		sortOrder = SortOrder_Desc
 	case "endtime":
 		orderBy = "END_TIME"
+		sortOrder = SortOrder_Desc
 	// case "starttime":
 	default:
 		orderBy = "START_TIME"
-		sortOrder = false
+		sortOrder = SortOrder_Desc
 	}
 
-	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrderText[sortOrder])
+	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
 
 	// ...
 
