@@ -95,14 +95,14 @@ var (
 )
 
 func DB() *sql.DB {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
 	return dbInstance
 }
 
 func getDB() *sql.DB {
 	if usage.IsServing() {
-		dbMutex.Lock()
-		defer dbMutex.Unlock()
-		return dbInstance
+		return DB()
 	} else {
 		return nil
 	}
