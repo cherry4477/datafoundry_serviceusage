@@ -37,6 +37,7 @@ type PurchaseOrder struct {
 	Next_consume_time time.Time  `json:"_,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
+	Creator           string     `json:"creator,omitempty"`
 }
 
 type ConsumingReport struct {
@@ -83,7 +84,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				ACCOUNT_ID, REGION, 
 				QUANTITIES, PLAN_ID, PLAN_TYPE, 
 				START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
-				STATUS
+				CREATOR, STATUS
 				) values (
 				?, 
 				?, ?, 
@@ -97,7 +98,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				orderInfo.Order_id, 
 				orderInfo.Account_id, orderInfo.Region,  
 				orderInfo.Quantities, orderInfo.Plan_id, orderInfo.Plan_type, 
-				orderInfo.Status,  
+				orderInfo.Creator, orderInfo.Status,  
 				)
 
 	return err
@@ -328,7 +329,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 					ACCOUNT_ID, REGION, 
 					QUANTITIES, PLAN_ID, PLAN_TYPE,
 					START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
-					STATUS
+					CREATOR, STATUS
 					from DF_PURCHASE_ORDER
 					%s
 					limit %d
@@ -352,7 +353,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 			&order.Account_id, &order.Region, 
 			&order.Quantities, &order.Plan_id, &order.Plan_type, 
 			&order.Start_time, &order.End_time, &order.Next_consume_time, &order.Last_consume_id,
-			&order.Status, 
+			&order.Creator, &order.Status, 
 		)
 		if err != nil {
 			return nil, err

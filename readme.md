@@ -22,8 +22,9 @@
 
 Body Parameters (json):
 ```
-accountId: 帐户Id，不可省略。
-planId: 套餐Id，不可省略。
+project: 不可省略。
+planId: 套餐Id，不可省略。 (todo: need Plan.PlanType, Plan.ConsumeType)
+creator: who made this order，可省略，如果不省略，auth user必须为管理员。
 ```
 
 Return Result (json):
@@ -32,7 +33,6 @@ code: 返回码
 msg: 返回信息
 orderId: 订单号。
 ```
-
 
 ### PUT /usageapi/v1/orders/{orderId}
 
@@ -46,7 +46,7 @@ orderId: 订单号。
 Body Parameters (json):
 ```
 action: 目前只支持cancel
-accountId: 帐户Id，不可省略，作校验用。
+project: 帐户Id，不可省略，作校验用。
 ```
 
 Return Result (json):
@@ -55,7 +55,7 @@ code: 返回码
 msg: 返回信息
 ```
 
-### GET /usageapi/v1/orders/{orderId}?account={accountId}
+### GET /usageapi/v1/orders/{orderId}?project={project}
 
 (一般情况下，用户不应该调用这个接口，用户看到的应该是服务实例。一个服务实例对应一个订单)
 
@@ -69,7 +69,7 @@ orderId: 订单号。
 
 Query Parameters:
 ```
-accountId: 被查询的帐户，不可省略，作校验用。
+project: 不可省略，作校验用。
 ```
 
 Return Result (json):
@@ -80,7 +80,7 @@ data.order
 data.order.id
 ```
 
-### GET /usageapi/v1/orders?account={accountId}&status={status}&orderby={orderby}
+### GET /usageapi/v1/orders?project={project}&status={status}&orderby={orderby}
 
 (一般情况下，用户不应该调用这个接口，用户看到的应该是服务实例列表。每个服务实例对应一个订单)
 
@@ -89,7 +89,7 @@ data.order.id
 
 Query Parameters:
 ```
-accountId: 被查询的帐户，不可省略，作校验用。
+project: 被不可省略，作校验用。
 status: 订单状态。consuming|ended。可以缺省，表示所有订单。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
@@ -106,15 +106,15 @@ data.orders[0].id
 
 ```
 
-### GET /usageapi/v1/usages?account={accountId}&order={orderId}
+### GET /usageapi/v1/usages?project={project}&order={orderId}
 
 1. 管理员查询任何订单的历史消费记录。
 1. 当前用户查询自己订单的历史消费记录。
 
 Query Parameters:
 ```
-accountId: 被查询的帐户，不可省略，作校验用。
-orderId: 订单号。可省略，表示accountId的所有订单。
+project: 被查询的帐户，不可省略，作校验用。
+orderId: 订单号。可省略，表示project内的所有订单。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
@@ -138,7 +138,7 @@ data.results[0].reports[0].consuming
 CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
    ORDER_ID           VARCHAR(64) NOT NULL,
-   ACCOUNT_ID         VARCHAR(64) NOT NULL,
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
    PLAN_ID            VARCHAR(64) NOT NULL,
@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    NEXT_CONSUME_TIME  DATETIME COMMENT 'when to charge next time',
    LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
    STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
+   CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 ```

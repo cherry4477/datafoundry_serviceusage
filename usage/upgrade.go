@@ -19,7 +19,7 @@ import (
 //=============================================================
 
 var dbUpgraders = []DatabaseUpgrader {
-	// newDatabaseUpgrader_0(),
+	newDatabaseUpgrader_0(),
 }
 
 const (

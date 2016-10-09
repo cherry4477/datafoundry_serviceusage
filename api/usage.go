@@ -96,6 +96,12 @@ func validateAccountID(accountId string) (string, *Error) {
 	return accountId, e
 }
 
+func validateUsername(accountId string) (string, *Error) {
+	// GetError2(ErrorCodeInvalidParameters, err.Error())
+	accountId, e := _mustStringParam("username", accountId, 50, StringParamType_UrlWord)
+	return accountId, e
+}
+
 func validatePlanID(planId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
 	planId, e := _mustStringParam("planId", planId, 50, StringParamType_UrlWord)
@@ -234,8 +240,9 @@ func canManagePurchaseOrders(username string) bool {
 //==================================================================
 
 type OrderCreation struct {
-	AccountID string    `json:"accountId,omitempty"`
+	AccountID string    `json:"project,omitempty"`
 	PlanID    string    `json:"planId,omitempty"`
+	Creator   string    `json:"creator,omitempty"`
 }
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -288,7 +295,17 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// todo: valid username accountId relation
+	// todo: validate auth username accountId relation
+
+	if orderCreation.Creator != "" {
+		orderCreation.Creator, e = validateUsername(orderCreation.AccountID)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+
+		// todo: validate auth username must be admin
+	}
 
 	planId, e := validatePlanID(orderCreation.PlanID)
 	if e != nil {
@@ -337,8 +354,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 }
 
 type OrderModification struct {
-	Action      string    `json:"action,omitempty"`
-	AccountID string    `json:"accountId,omitempty"`
+	Action      string  `json:"action,omitempty"`
+	AccountID string    `json:"project,omitempty"`
 }
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -451,7 +468,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	accountId, e := validateAccountID(r.FormValue("account"))
+	accountId, e := validateAccountID(r.FormValue("project"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -524,7 +541,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
-	accountId, e := validateAccountID(r.FormValue("account"))
+	accountId, e := validateAccountID(r.FormValue("project"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
