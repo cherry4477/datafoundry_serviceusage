@@ -34,6 +34,7 @@ const (
 	ErrorCodeModifyOrder           = 3310
 	ErrorCodeGetOrder              = 3311
 	ErrorCodeQueryOrders           = 3312
+	ErrorCodeQueryConsumings       = 3312
 
 
 
@@ -57,6 +58,8 @@ func init() {
 	initError(ErrorCodeModifyOrder, "failed to modify app")
 	initError(ErrorCodeGetOrder, "failed to retrieve app")
 	initError(ErrorCodeQueryOrders, "failed to query apps")
+
+	initError(ErrorCodeQueryConsumings, "failed to consuming history")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)

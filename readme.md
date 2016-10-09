@@ -77,7 +77,15 @@ Return Result (json):
 code: 返回码
 msg: 返回信息
 data.order
-data.order.id
+data.order.orderId
+data.order.project
+data.order.region
+data.order.quantities
+data.order.planId
+data.order.startTime
+data.order.endTime: 只有订单已经被终止的时候存在
+data.order.status: "pending" | "consuming" | "ending" | "ended"
+data.order.creator
 ```
 
 ### GET /usageapi/v1/orders?project={project}&status={status}&orderby={orderby}
@@ -101,7 +109,15 @@ code: 返回码
 msg: 返回信息
 data.total
 data.orders
-data.orders[0].id
+data.orders[0].orderId
+data.orders[0].project
+data.orders[0].region
+data.orders[0].quantities
+data.orders[0].planId
+data.orders[0].startTime
+data.orders[0].endTime: 只有订单已经被终止的时候存在
+data.orders[0].status: "pending" | "consuming" | "ending" | "ended"
+data.orders[0].creator
 ...
 
 ```
@@ -115,6 +131,7 @@ Query Parameters:
 ```
 project: 被查询的帐户，不可省略，作校验用。
 orderId: 订单号。可省略，表示project内的所有订单。
+region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
@@ -125,9 +142,12 @@ code: 返回码
 msg: 返回信息
 data.total
 data.results
+data.results[0].orderId
+data.results[0].project
+data.results[0].region
 data.results[0].time
-data.results[0].reports
-data.results[0].reports[0].consuming
+data.results[0].money
+data.results[0].planId
 ......
 ...
 ```
@@ -153,15 +173,24 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 )  DEFAULT CHARSET=UTF8;
 ```
 
+SERVICE_PARAM0
+SERVICE_PARAM1
+SERVICE_PARAM2
+
+SERVICE_PARAM0
+SERVICE_PARAM1
+SERVICE_PARAM2
+
 对后付费，消费报表:
 ```
-CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
    ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
    CONSUME_ID         INT,
-   CONSUME_TIME       DATETIME,
    CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
+   CONSUME_TIME       DATETIME,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
    PRIMARY KEY (ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;

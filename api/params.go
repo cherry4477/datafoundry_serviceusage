@@ -134,7 +134,14 @@ func initDB() bool {
 		return false
 	}
 
-	upgradeDB()
+	// upgradeDB()
+	err := usage.TryToUpgradeDatabase(DB(), "datafoundry:serviceusage", os.Getenv("MYSQL_CONFIG_DONT_UPGRADE_TABLES") != "yes") // don't change the name
+	if err != nil {
+		Logger.Errorf("TryToUpgradeDatabase error: %s", err.Error())
+		return false
+	}
+
+	// ...
 
 	go updateDB()
 
@@ -171,16 +178,13 @@ func connectDB() {
 
 	if err != nil {
 		Logger.Errorf("error: %s\n", err)
+		if db != nil {
+			db.Close()
+		}
+		return
 	}
 	
 	setDB(db)
-}
-
-func upgradeDB() {
-	err := usage.TryToUpgradeDatabase(DB(), "datafoundry:serviceusage", os.Getenv("MYSQL_CONFIG_DONT_UPGRADE_TABLES") != "yes") // don't change the name
-	if err != nil {
-		Logger.Errorf("TryToUpgradeDatabase error: %s", err.Error())
-	}
 }
 
 //======================================================

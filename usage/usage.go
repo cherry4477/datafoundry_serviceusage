@@ -26,42 +26,19 @@ const (
 
 type PurchaseOrder struct {
 	Order_id          string     `json:"orderId,omitempty"`
-	Account_id        string     `json:"accountId,omitempty"`
+	Account_id        string     `json:"project,omitempty"` // accountId
 	Region            string     `json:"region,omitempty"`
 	Quantities        int        `json:"quantities,omitempty"`
 	Plan_id           string     `json:"planId,omitempty"`
 	Plan_type         string     `json:"_,omitempty"`
 	Start_time        time.Time  `json:"startTime,omitempty"`
-	End_time          time.Time  `json:"_,omitempty"` // po 
+	End_time          time.Time  `json:"_,omitempty"`       // po 
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
 	Next_consume_time time.Time  `json:"_,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
 	Creator           string     `json:"creator,omitempty"`
 }
-
-type ConsumingReport struct {
-	Order_id          string    `json:"orderId,omitempty"`
-	Consume_id        int       `json:"_,omitempty"`
-	Consume_time      time.Time `json:"time,omitempty"`
-	Consuming         int64     `json:"_,omitempty"`         // po
-	Money             float64   `json:"money,omitempty"` // vo, Money = Consuming * 0.0001
-	Account_id        string    `json:"_,omitempty"`
-	Plan_id           string    `json:"planId,omitempty"`
-}
-
-/*
-CREATE TABLE IF NOT EXISTS DF_CONSUMING_REPORT
-(
-   ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
-   CONSUME_ID         INT,
-   CONSUME_TIME       DATETIME,
-   CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
-   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
-   PRIMARY KEY (ORDER_ID, CONSUME_ID)
-)  DEFAULT CHARSET=UTF8;
-
-*/
 
 //=============================================================
 //
@@ -365,5 +342,143 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 	}
 
 	return orders, nil
+}
+
+//==================================================================
+// reports
+//==================================================================
+
+func ConsumingToMoney(consuming int64) float64 {
+	return 0.0001 * float64(consuming) // DON"T CHANGE
+}
+
+func MoneyToConsuming(money float64) int64 {
+	return int64(money * 10000) // DON"T CHANGE
+}
+
+type ConsumeHistory struct {
+	Order_id          string    `json:"orderId,omitempty"`
+	Consume_id        int       `json:"_,omitempty"`
+	Consume_time      time.Time `json:"time,omitempty"`
+	Consuming         int64     `json:"_,omitempty"`       // po
+	Money             float64   `json:"money,omitempty"`   // vo, Money = Consuming * 0.0001
+	Account_id        string    `json:"project,omitempty"` // accountId
+	Region            string    `json:"region,omitempty"`
+	Plan_id           string    `json:"planId,omitempty"`
+}
+
+func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeId int, consumeTime time.Time, money float64) error {
+	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
+	if err != nil {
+		return err
+	}
+	if order != nil {
+		return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
+	}
+
+	consuming := MoneyToConsuming(money)
+
+	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
+				ORDER_ID, CONSUME_ID,
+				CONSUMING, CONSUME_TIME,
+				ACCOUNT_ID, REGION, PLAN_ID
+				) values (
+				%d, %d, 
+				%d, '%s', 
+				'%s', '%s', '%s'
+				)`, 
+				orderInfo.Order_id, consumeId,
+				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), 
+				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, 
+				)
+	_, err = db.Exec(sqlstr)
+
+	return err
+}
+
+func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region string, offset int64, limit int) (int64, []*ConsumeHistory, error) {
+	return 0, []*ConsumeHistory{}, nil
+}
+
+//================================================
+
+func getConsumingList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlSort string, sqlParams ...interface{}) (int64, []*PurchaseOrder, error) {
+	//if strings.TrimSpace(sqlWhere) == "" {
+	//	return 0, nil, errors.New("sqlWhere can't be blank")
+	//}
+
+	count, err := queryOrdersCount(db, sqlWhere)
+	if err != nil {
+		return 0, nil, err
+	}
+	if count == 0 {
+		return 0, []*PurchaseOrder{}, nil
+	}
+	validateOffsetAndLimit(count, &offset, &limit)
+
+	subs, err := queryOrders(db,
+		fmt.Sprintf(`%s order by %s`, sqlWhere, sqlSort),
+		limit, offset, sqlParams...)
+
+	return count, subs, err
+}
+
+func queryConsumingsCount(db *sql.DB, sqlWhere string, sqlParams ...interface{}) (int64, error) {
+	sqlWhere = strings.TrimSpace(sqlWhere)
+	sql_where_all := ""
+	if sqlWhere != "" {
+		sql_where_all = fmt.Sprintf("where %s", sqlWhere)
+	}
+
+	count := int64(0)
+	sql_str := fmt.Sprintf(`select COUNT(*) from DF_CONSUMING_HISTORY %s`, sql_where_all)
+	err := db.QueryRow(sql_str, sqlParams...).Scan(&count)
+
+	return count, err
+}
+
+func queryConsumings(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
+	offset_str := ""
+	if offset > 0 {
+		offset_str = fmt.Sprintf("offset %d", offset)
+	}
+	sql_str := fmt.Sprintf(`select
+					ORDER_ID, CONSUME_ID,
+					CONSUMING, CONSUME_TIME,
+					ACCOUNT_ID, REGION, PLAN_ID
+					from DF_CONSUMING_HISTORY
+					%s
+					limit %d
+					%s
+					`,
+		sqlWhereAll,
+		limit,
+		offset_str)
+	rows, err := db.Query(sql_str, sqlParams...)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	consumings := make([]*ConsumeHistory, 0, 100)
+	for rows.Next() {
+		consume := &ConsumeHistory{}
+		err := rows.Scan(
+			&consume.Order_id, &consume.Consume_id, 
+			&consume.Consuming, &consume.Consume_time, 
+			&consume.Account_id, &consume.Region, &consume.Plan_id, 
+		)
+		if err != nil {
+			return nil, err
+		}
+		consume.Money = ConsumingToMoney(consume.Consuming)
+		consumings = append(consumings, consume)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return consumings, nil
 }
 

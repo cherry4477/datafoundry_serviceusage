@@ -108,6 +108,16 @@ func validatePlanID(planId string) (string, *Error) {
 	return planId, e
 }
 
+func validateRegion(region string) (string, *Error) {
+	switch region {
+	default:
+		return "", newInvalidParameterError("invalid region parameter")
+	case "bj":
+	}
+
+	return region, nil
+}
+
 func validateOrderStatus(statusName string) (int, *Error) {
 	var status = -1
 
@@ -572,7 +582,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 }
 
 //==================================================================
-//
+// reports
 //==================================================================
 
 /*
@@ -594,25 +604,91 @@ func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedRepo
 */
 
 func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	reports := []*usage.ConsumingReport {
+	consumings := []*usage.ConsumeHistory {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Region: "bj",
 			Consume_time: time.Date(2016, time.May, 10, 24, 0, 0, 0, time.UTC),
 			Money: 1.23,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
+			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Region: "bj",
 			Consume_time: time.Date(2016, time.May, 10, 25, 0, 0, 0, time.UTC),
 			Money: 1.23,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
 		},
 	}
 
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, reports))
-	
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, consumings))
+
 	return
-	/////////////////////////////////////////////////////////////////////////////////
+
+	// the real implementation
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	accountId, e := validateAccountID(r.FormValue("project"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	// todo: check if username has the permission to view orders of accountId.
+	_, _ = username, accountId
+
+	// ...
+
+	orderId := r.FormValue("orderId")
+	if orderId != "" {
+		orderId, e = validateOrderID(orderId)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+
+	// ...
+
+	region := r.FormValue("region")
+	if orderId != "" {
+		region, e = validateRegion(region)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+
+	// ...
+
+	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
+	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
+	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
+
+	count, consumings, err := usage.QueryConsumeHistories(db, accountId, orderId, region, offset, size)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error()), nil)
+		return
+	}
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, consumings))
 }
 
 /*
