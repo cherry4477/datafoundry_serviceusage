@@ -54,8 +54,8 @@ func Init(router *httprouter.Router) bool {
 
 func initRouter(router *httprouter.Router) {
 	router.POST("/usageapi/v1/orders", TimeoutHandle(500*time.Millisecond, CreateOrder))
-	router.PUT("/usageapi/v1/orders/{orderId}", TimeoutHandle(500*time.Millisecond, ModifyOrder))
-	router.GET("/usageapi/v1/orders/{orderId}", TimeoutHandle(500*time.Millisecond, GetAccountOrder))
+	router.PUT("/usageapi/v1/orders/:orderId", TimeoutHandle(500*time.Millisecond, ModifyOrder))
+	router.GET("/usageapi/v1/orders/:orderId", TimeoutHandle(500*time.Millisecond, GetAccountOrder))
 	router.GET("/usageapi/v1/orders", TimeoutHandle(500*time.Millisecond, QueryAccountOrders))
 	router.GET("/usageapi/v1/usages", TimeoutHandle(500*time.Millisecond, QueryAccountConsumingReports))
 	//router.GET("/usageapi/v1/speed", TimeoutHandle(500*time.Millisecond, GetAccountConsumingSpeed))

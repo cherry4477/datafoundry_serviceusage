@@ -201,7 +201,6 @@ func QueryOrders(db *sql.DB, accountId string, status int, offset int64, limit i
 
 	// ...
 
-
 	orderBy, sortOrder := "", ""
 	
 	switch strings.ToLower(orderBy) {
@@ -397,26 +396,50 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeId int, c
 }
 
 func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region string, offset int64, limit int) (int64, []*ConsumeHistory, error) {
-	return 0, []*ConsumeHistory{}, nil
+	sqlParams := make([]interface{}, 0, 4)
+	
+	// ...
+
+	sqlWhere := "ACCOUNT_ID=?"
+	sqlParams = append(sqlParams, accountId)
+	
+	if orderId != "" {
+		sqlWhere = sqlWhere + " and ORDER_ID=?"
+		sqlParams = append(sqlParams, orderId)
+	}
+	if region != "" {
+		sqlWhere = sqlWhere + " and REGION=?"
+		sqlParams = append(sqlParams, region)
+	}
+
+	// ...
+
+	orderBy, sortOrder := "CONSUME_TIME", SortOrder_Desc
+
+	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
+
+	// ...
+
+	return getConsumingList(db, offset, limit, sqlWhere, sqlSort, sqlParams...)
 }
 
 //================================================
 
-func getConsumingList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlSort string, sqlParams ...interface{}) (int64, []*PurchaseOrder, error) {
+func getConsumingList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlSort string, sqlParams ...interface{}) (int64, []*ConsumeHistory, error) {
 	//if strings.TrimSpace(sqlWhere) == "" {
 	//	return 0, nil, errors.New("sqlWhere can't be blank")
 	//}
 
-	count, err := queryOrdersCount(db, sqlWhere)
+	count, err := queryConsumingsCount(db, sqlWhere)
 	if err != nil {
 		return 0, nil, err
 	}
 	if count == 0 {
-		return 0, []*PurchaseOrder{}, nil
+		return 0, []*ConsumeHistory{}, nil
 	}
 	validateOffsetAndLimit(count, &offset, &limit)
 
-	subs, err := queryOrders(db,
+	subs, err := queryConsumings(db,
 		fmt.Sprintf(`%s order by %s`, sqlWhere, sqlSort),
 		limit, offset, sqlParams...)
 
