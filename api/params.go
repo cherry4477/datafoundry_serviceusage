@@ -149,6 +149,7 @@ func updateDB() {
 		if db == nil {
 			connectDB()
 		} else if err = db.Ping(); err != nil {
+			Logger.Errorf("db ping error: %s\n", err)
 			db.Close()
 			// setDB(nil) // draw snake feet
 			connectDB()
@@ -170,9 +171,9 @@ func connectDB() {
 
 	if err != nil {
 		Logger.Errorf("error: %s\n", err)
-	} else {
-		setDB(db)
 	}
+	
+	setDB(db)
 }
 
 func upgradeDB() {
