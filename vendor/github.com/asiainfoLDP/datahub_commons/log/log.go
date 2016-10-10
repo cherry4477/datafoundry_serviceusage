@@ -71,11 +71,6 @@ func (l *Logger)Level() int {
 
 var defaultlLogger = NewLogger("")
 
-// todo: remove this
-func DefaultlLogger() *Logger {
-	return defaultlLogger
-}
-
 func DefaultLogger() *Logger {
 	return defaultlLogger
 }

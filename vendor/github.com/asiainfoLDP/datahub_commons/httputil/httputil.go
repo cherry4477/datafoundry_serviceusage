@@ -49,7 +49,7 @@ func (h *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			tw.w.Write([]byte(h.errorBody()))
 		}
 		tw.timedOut = true
-		log.DefaultlLogger().Warningf("timeout: %s", r.URL.String())
+		log.DefaultLogger().Warningf("timeout: %s", r.URL.String())
 	}
 }
 

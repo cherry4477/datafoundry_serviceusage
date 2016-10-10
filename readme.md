@@ -8,9 +8,12 @@
 ## 套餐属性
 
 套餐属性：
-* plan type: 目前只支持订单有效期前7天扣费
+* plan type: cpuqouta | bsi | ...
+* consume type: 扣费方式
 * price: cost per circle
-* circle: 扣费周期类型，目前之支持自然月
+* circle: 扣费周期类型，目前之支持自然月，或许可以包含在consume type中
+
+一个套餐或许需要若干参数，在Order中记录这些参数值。
 
 订单对应的服务实例的配置和套餐不可更改。若需更改，需创建一个新的订单并终止老的订单。
 
@@ -160,12 +163,12 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    ORDER_ID           VARCHAR(64) NOT NULL,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
-   QUANTITIES         INT DEFAULT 1 COMMENT 'for postpay only',
+   QUANTITIES         INT DEFAULT 1,
    PLAN_ID            VARCHAR(64) NOT NULL,
    PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
    START_TIME         DATETIME,
    END_TIME           DATETIME COMMENT 'invalid when status is consuming',
-   NEXT_CONSUME_TIME  DATETIME COMMENT 'when to charge next time',
+   DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
    LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
    STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
    CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
@@ -173,13 +176,16 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 )  DEFAULT CHARSET=UTF8;
 ```
 
-SERVICE_PARAM0
-SERVICE_PARAM1
-SERVICE_PARAM2
+这里的QUANTITIES或许并不充足，最好加几个字段以便扩展：
+```
+SERVICE_PARAM0 VARCHAR(255)
+SERVICE_PARAM1 INT DEFAULT 0
+SERVICE_PARAM2 INT DEFAULT 0
 
-SERVICE_PARAM0
-SERVICE_PARAM1
-SERVICE_PARAM2
+SERVICE_PARAM0 VARCHAR(255)
+SERVICE_PARAM1 INT DEFAULT 0
+SERVICE_PARAM2 INT DEFAULT 0
+```
 
 对后付费，消费报表:
 ```

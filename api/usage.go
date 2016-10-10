@@ -67,6 +67,10 @@ func genOrderID() string {
 	return string(base64.RawURLEncoding.EncodeToString(bs))
 }
 
+func buildOrderID(accountId, planType string) string {
+	return fmt.Sprintf("%s_%s", accountId, planType)
+}
+
 //==================================================================
 //
 //==================================================================
@@ -333,7 +337,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	now := time.Now()
 	startTime := now
 	endTime := now
-	nextConsumeTime := now
+	deadlineTime := now
 
 	order := &usage.PurchaseOrder{
 		Order_id: genUUID(),
@@ -345,7 +349,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 		Start_time: startTime,
 		End_time: endTime,
-		Next_consume_time: nextConsumeTime,
+		Deadline_time: deadlineTime,
 
 		Status: usage.OrderStatus_Pending,
 	}

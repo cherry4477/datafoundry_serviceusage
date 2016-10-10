@@ -35,7 +35,7 @@ var Platform = Platform_DataOS
 
 var Port int
 var Debug = false
-var Logger = log.DefaultlLogger()
+var Logger = log.DefaultLogger()
 
 func Init(router *httprouter.Router) bool {
 	Platform = os.Getenv("CLOUD_PLATFORM")

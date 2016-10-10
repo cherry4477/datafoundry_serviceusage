@@ -99,13 +99,13 @@ func main() {
 	// market
 
 	if api.Init(router) == false {
-		log.DefaultlLogger().Fatal("failed to initdb")
+		log.DefaultLogger().Fatal("failed to initdb")
 	}
 
 	// ...
 
 	service := newService(*port)
 	address := fmt.Sprintf(":%d", service.httpPort)
-	log.DefaultlLogger().Infof("Listening http at: %s\n", address)
-	log.DefaultlLogger().Fatal(http.ListenAndServe(address, httputil.TimeoutHandler(router, 250*time.Millisecond, ""))) // will block here
+	log.DefaultLogger().Infof("Listening http at: %s\n", address)
+	log.DefaultLogger().Fatal(http.ListenAndServe(address, httputil.TimeoutHandler(router, 250*time.Millisecond, ""))) // will block here
 }

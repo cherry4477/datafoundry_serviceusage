@@ -34,7 +34,7 @@ type PurchaseOrder struct {
 	Start_time        time.Time  `json:"startTime,omitempty"`
 	End_time          time.Time  `json:"_,omitempty"`       // po 
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
-	Next_consume_time time.Time  `json:"_,omitempty"`
+	Deadline_time     time.Time  `json:"deadline,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
 	Status            int        `json:"status,omitempty"`
 	Creator           string     `json:"creator,omitempty"`
@@ -55,12 +55,12 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 
 	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
-	consumeTime := orderInfo.Next_consume_time.Format("2006-01-02 15:04:05.999999")
+	consumeTime := orderInfo.Deadline_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
 				ORDER_ID,
 				ACCOUNT_ID, REGION, 
 				QUANTITIES, PLAN_ID, PLAN_TYPE, 
-				START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
+				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
 				CREATOR, STATUS
 				) values (
 				?, 
@@ -94,11 +94,11 @@ func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
 		return fmt.Errorf("order (id=%s) not in consuming status", orderId)
 	}
 
-	// todo: renewToTime should be larger than NEXT_CONSUME_TIME
+	// todo: renewToTime should be larger than DEADLINE_TIME
 
 	timestr := renewToTime.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				NEXT_CONSUME_TIME='%s'
+				DEADLINE_TIME='%s'
 				where ORDER_ID=?`, 
 				timestr,
 				)
@@ -205,7 +205,7 @@ func QueryOrders(db *sql.DB, accountId string, status int, offset int64, limit i
 	
 	switch strings.ToLower(orderBy) {
 	case "consumetime":
-		orderBy = "NEXT_CONSUME_TIME"
+		orderBy = "DEADLINE_TIME"
 		sortOrder = SortOrder_Desc
 	case "endtime":
 		orderBy = "END_TIME"
@@ -304,7 +304,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 					ORDER_ID, 
 					ACCOUNT_ID, REGION, 
 					QUANTITIES, PLAN_ID, PLAN_TYPE,
-					START_TIME, END_TIME, NEXT_CONSUME_TIME, LAST_CONSUME_ID, 
+					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
 					CREATOR, STATUS
 					from DF_PURCHASE_ORDER
 					%s
@@ -328,7 +328,7 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 			&order.Order_id, 
 			&order.Account_id, &order.Region, 
 			&order.Quantities, &order.Plan_id, &order.Plan_type, 
-			&order.Start_time, &order.End_time, &order.Next_consume_time, &order.Last_consume_id,
+			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id,
 			&order.Creator, &order.Status, 
 		)
 		if err != nil {
@@ -342,6 +342,12 @@ func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlPar
 
 	return orders, nil
 }
+
+//==================================================================
+// auto renew
+//==================================================================
+
+// TODO: extend order deadline
 
 //==================================================================
 // reports
