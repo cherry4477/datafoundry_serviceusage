@@ -211,6 +211,8 @@ oc new-app --name datafoundryserviceusage https://github.com/asiainfoLDP/datafou
     -e  CLOUD_PLATFORM="dataos" \
     \
     -e  DATAFOUNDRY_HOST_ADDR="xxx" \
+    -e  PLAN_SERVICE_API_SERVER="xxx" \
+    -e  CHARGE_SERVICE_API_SERVER="xxx" \
     \
     -e  ENV_NAME_MYSQL_ADDR="BSI_MYSQL_MYSQLFORSERVICEUSAGE_HOST" \
     -e  ENV_NAME_MYSQL_PORT="BSI_MYSQL_MYSQLFORSERVICEUSAGE_PORT" \

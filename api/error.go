@@ -34,7 +34,9 @@ const (
 	ErrorCodeModifyOrder           = 3310
 	ErrorCodeGetOrder              = 3311
 	ErrorCodeQueryOrders           = 3312
-	ErrorCodeQueryConsumings       = 3312
+	ErrorCodeRenewOrder            = 3313
+	ErrorCodeQueryConsumings       = 3314
+	ErrorCodeGetPlan               = 3315
 
 
 
@@ -53,13 +55,16 @@ func init() {
 	initError(ErrorCodePermissionDenied, "permission denied")
 	initError(ErrorCodeInvalidParameters, "invalid parameters")
 
-	initError(ErrorCodeCreateOrder, "failed to create app")
-	initError(ErrorCodeDeleteOrder, "failed to delete app")
-	initError(ErrorCodeModifyOrder, "failed to modify app")
-	initError(ErrorCodeGetOrder, "failed to retrieve app")
-	initError(ErrorCodeQueryOrders, "failed to query apps")
+	initError(ErrorCodeCreateOrder, "failed to create order")
+	initError(ErrorCodeDeleteOrder, "failed to delete order")
+	initError(ErrorCodeModifyOrder, "failed to modify order")
+	initError(ErrorCodeGetOrder, "failed to retrieve order")
+	initError(ErrorCodeQueryOrders, "failed to query orders")
+	initError(ErrorCodeRenewOrder, "failed to renew order")
 
 	initError(ErrorCodeQueryConsumings, "failed to consuming history")
+
+	initError(ErrorCodeGetPlan, "failed to get plan")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)

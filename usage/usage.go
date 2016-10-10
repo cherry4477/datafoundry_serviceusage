@@ -81,28 +81,39 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	return err
 }
 
-/*
-func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
-	order, err := RetrieveOrderByID(db, orderId)
+func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) error {
+	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	if order != nil {
-		return fmt.Errorf("order (id=%s) already existed", orderId)
+
+	order, err := RetrieveOrderByID(tx, orderId)
+	if err != nil {
+		tx.Rollback()
+		return err
 	}
-	if order.Status != OrderStatus_Consuming {
-		return fmt.Errorf("order (id=%s) not in consuming status", orderId)
+	if order == nil {
+		tx.Rollback()
+		return fmt.Errorf("order (id=%s) not found", orderId)
 	}
 
-	// todo: renewToTime should be larger than DEADLINE_TIME
+	// need checking this? This function should be only called when a payment was just made.
+	//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
+	//	tx.Rollback()
+	//	return fmt.Errorf("order (id=%s) not consumable", orderId)
+	//}
 
-	timestr := renewToTime.Format("2006-01-02 15:04:05.999999")
+	// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
+
+	order.Deadline_time = order.Deadline_time.Add(extendedDuration)
+	timestr := order.Deadline_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s'
+				DEADLINE_TIME='%s' and STATUS=%d
 				where ORDER_ID=?`, 
 				timestr,
+				OrderStatus_Consuming,
 				)
-	result, err := db.Exec(sqlstr,
+	result, err := tx.Exec(sqlstr,
 				orderId,
 				)
 	_ = result
@@ -115,9 +126,13 @@ func RenewOrder(db *sql.DB, orderId string, renewToTime time.Time) error {
 	//	return fmt.Errorf("order (%s) not found", orderId)
 	//}
 
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
-*/
 
 func EndOrder(db *sql.DB, orderId string, accountId string) error {
 	order, err := RetrieveOrderByID(db, orderId)
@@ -156,11 +171,11 @@ func EndOrder(db *sql.DB, orderId string, accountId string) error {
 	return nil
 }
 
-func RetrieveOrderByID(db *sql.DB, orderId string) (*PurchaseOrder, error) {
+func RetrieveOrderByID(db DbOrTx, orderId string) (*PurchaseOrder, error) {
 	return getSingleOrder(db, fmt.Sprintf("where ORDER_ID='%s'", orderId))
 }
 
-func getSingleOrder(db *sql.DB, sqlWhere string) (*PurchaseOrder, error) {
+func getSingleOrder(db DbOrTx, sqlWhere string) (*PurchaseOrder, error) {
 	orders, err := queryOrders(db, sqlWhere, 1, 0)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -177,7 +192,7 @@ func getSingleOrder(db *sql.DB, sqlWhere string) (*PurchaseOrder, error) {
 	return orders[0], nil
 }
 
-func QueryOrders(db *sql.DB, accountId string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
+func QueryOrders(db DbOrTx, accountId string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
@@ -225,6 +240,15 @@ func QueryOrders(db *sql.DB, accountId string, status int, offset int64, limit i
 
 //================================================
 
+type DbOrTx interface {
+        Exec(query string, args ...interface{}) (sql.Result, error)
+        Prepare(query string) (*sql.Stmt, error)
+        Query(query string, args ...interface{}) (*sql.Rows, error)
+        QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+//================================================
+
 func validateOffsetAndLimit(count int64, offset *int64, limit *int) {
 	if *limit < 1 {
 		*limit = 1
@@ -260,7 +284,7 @@ func ValidateSortOrder(sortOrder string, defaultOrder bool) bool {
 	return defaultOrder
 }
 
-func getOrderList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlSort string, sqlParams ...interface{}) (int64, []*PurchaseOrder, error) {
+func getOrderList(db DbOrTx, offset int64, limit int, sqlWhere string, sqlSort string, sqlParams ...interface{}) (int64, []*PurchaseOrder, error) {
 	//if strings.TrimSpace(sqlWhere) == "" {
 	//	return 0, nil, errors.New("sqlWhere can't be blank")
 	//}
@@ -281,7 +305,7 @@ func getOrderList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlSort 
 	return count, subs, err
 }
 
-func queryOrdersCount(db *sql.DB, sqlWhere string, sqlParams ...interface{}) (int64, error) {
+func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int64, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
 	sql_where_all := ""
 	if sqlWhere != "" {
@@ -295,7 +319,7 @@ func queryOrdersCount(db *sql.DB, sqlWhere string, sqlParams ...interface{}) (in
 	return count, err
 }
 
-func queryOrders(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
+func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
 	offset_str := ""
 	if offset > 0 {
 		offset_str = fmt.Sprintf("offset %d", offset)

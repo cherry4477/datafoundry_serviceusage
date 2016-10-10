@@ -46,11 +46,16 @@ func genUUID() string {
 	return fmt.Sprintf("%X-%X-%X-%X-%X", bs[0:4], bs[4:6], bs[6:8], bs[8:10], bs[10:])
 }
 
-func genOrderID() string {
+func genOrderID(accountId, planType string) string {
+	switch planType {
+	case PLanType_Quota:
+		return fmt.Sprintf("%s-%s", accountId, planType)
+	}
+
 	bs := make([]byte, 12)
 	_, err := rand.Read(bs)
 	if err != nil {
-		Logger.Warning("genUUID error: ", err.Error())
+		Logger.Warning("genOrderID error: ", err.Error())
 
 		//mathrand.Read(bs)
 		n := time.Now().UnixNano()
@@ -143,93 +148,6 @@ func validateOrderStatus(statusName string) (int, *Error) {
 	return status, nil
 }
 
-/*
-func validateOrderName(name string, musBeNotBlank bool) (string, *Error) {
-	if musBeNotBlank || name != "" {
-		// most 20 Chinese chars
-		name_param, e := _mustStringParam("name", name, 60, StringParamType_General)
-		if e != nil {
-			return "", e
-		}
-		name = name_param
-	}
-
-	return name, nil
-}
-
-func validateOrderVersion(version string, musBeNotBlank bool) (string, *Error) {
-	if musBeNotBlank || version != "" {
-		version_param, e := _mustStringParam("version", version, 32, StringParamType_General)
-		if e != nil {
-			return "", e
-		}
-		version = version_param
-	}
-
-	return version, nil
-}
-
-func validateOrderProvider(provider string, musBeNotBlank bool) (string, *Error) {
-	if musBeNotBlank || provider != "" {
-		// most 20 Chinese chars
-		provider_param, e := _mustStringParam("provider", provider, 60, StringParamType_General)
-		if e != nil {
-			return "", e
-		}
-		provider = provider_param
-	}
-
-	return provider, nil
-}
-
-func validateOrderCategory(category string, musBeNotBlank bool) (string, *Error) {
-	if musBeNotBlank || category != "" {
-		// most 10 Chinese chars
-		category_param, e := _mustStringParam("category", category, 32, StringParamType_General)
-		if e != nil {
-			return "", e
-		}
-		category = category_param
-	}
-
-	return category, nil
-}
-
-func validateOrderDescription(description string, musBeNotBlank bool) (string, *Error) {
-	if musBeNotBlank || description != "" {
-		// most about 666 Chinese chars
-		description_param, e := _mustStringParam("description", description, 2000, StringParamType_General)
-		if e != nil {
-			return "", e
-		}
-		description = description_param
-	}
-
-	return description, nil
-}
-
-func validateUrl(url string, musBeNotBlank bool, paramName string) (string, *Error) {
-	url = strings.TrimSpace(url)
-
-	if len(url) > 200 {
-		return "", newInvalidParameterError(fmt.Sprintf("%s is too long", paramName))
-	}
-
-	if url == "" {
-		if musBeNotBlank {
-			return "", newInvalidParameterError(fmt.Sprintf("%s can't be blank", paramName))
-		}
-
-		_, err := neturl.Parse(url)
-		if err != nil {
-			return "", newInvalidParameterError(err.Error())
-		}
-	}
-
-	return url, nil
-}
-*/
-
 // ...
 
 func validateAuth(token string) (string, *Error) {
@@ -297,12 +215,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	//orderMode, e := validateOrderMode(orderCreation.Mode)
-	//if e != nil {
-	//	JsonResult(w, http.StatusBadRequest, e, nil)
-	//	return
-	//}
-
 	accountId, e := validateAccountID(orderCreation.AccountID)
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
@@ -327,11 +239,16 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// todo: remote get plan
+	// ...
+	plan, err := getPlanByID(planId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error()), nil)
+		return
+	}
 
-	planId = planId 
-	planType := "unknown"
-	planRegion := "unknown"
+	// assert planId == plan.Plan_id 
+	planType := plan.Plan_type
+	planRegion := plan.Region
 
 	// ...
 	now := time.Now()
@@ -340,7 +257,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	deadlineTime := now
 
 	order := &usage.PurchaseOrder{
-		Order_id: genUUID(),
+		Order_id: genOrderID(accountId, planType),
 		Account_id: accountId,
 
 		Plan_id : planId,
@@ -360,9 +277,15 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// todo: remote make payment
-	// todo: change order status => consuming
-	// todo: create a consuming report
+	// ...
+	err = renewOrder(accountId, order.Order_id, plan)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
+		
+		// todo: remove pending order, needed?
+		
+		return
+	}
 
 	JsonResult(w, http.StatusOK, nil, order.Order_id)
 }
@@ -377,7 +300,6 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	JsonResult(w, http.StatusOK, nil, nil)
 	
 	return
-
 
 	// the real implementation
 
@@ -450,7 +372,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	order := &usage.PurchaseOrder {
 		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-		Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Account_id: r.FormValue("project"),
 		Region: "bj",
 		Quantities: 1,
 		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
@@ -512,7 +434,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	orders := []*usage.PurchaseOrder {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Account_id: r.FormValue("project"),
 			Region: "bj",
 			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
@@ -522,7 +444,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		},
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+			Account_id: r.FormValue("project"),
 			Region: "bj",
 			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",

@@ -47,6 +47,7 @@ func Init(router *httprouter.Router) bool {
 		return false
 	}
 
+	initGateWay()
 	initRouter(router)
 
 	return true
@@ -142,6 +143,8 @@ func initDB() bool {
 	}
 
 	// ...
+
+	go StartMaintaining()
 
 	go updateDB()
 
@@ -368,7 +371,6 @@ func mustFloatParam(params httprouter.Params, paramName string) (float64, *Error
 	return f, nil
 }
 
-// todo: add max length param
 func _mustStringParam(paramName string, str string, maxLength int, paramType int) (string, *Error) {
 	if str == "" {
 		return "", newInvalidParameterError(fmt.Sprintf("%s can't be blank", paramName))
