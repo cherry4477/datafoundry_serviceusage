@@ -11,6 +11,8 @@ import (
 
 func StartMaintaining() {
 	Logger.Infof("Maintaining started ...")
+
+	// find all consuming orders which dataline < now()+7_days.
 }
 
 //======================================================
