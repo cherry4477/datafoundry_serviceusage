@@ -28,7 +28,6 @@ type PurchaseOrder struct {
 	Order_id          string     `json:"orderId,omitempty"`
 	Account_id        string     `json:"project,omitempty"` // accountId
 	Region            string     `json:"region,omitempty"`
-	Quantities        int        `json:"quantities,omitempty"`
 	Plan_id           string     `json:"planId,omitempty"`
 	Plan_type         string     `json:"_,omitempty"`
 	Start_time        time.Time  `json:"startTime,omitempty"`
@@ -36,7 +35,8 @@ type PurchaseOrder struct {
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
 	Deadline_time     time.Time  `json:"deadline,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
-	Status            int        `json:"status,omitempty"`
+	Status            int        `json:"_,omitempty"`      // po
+	StatusLabel       string     `json:"status,omitempty"` // vo
 	Creator           string     `json:"creator,omitempty"`
 }
 
@@ -50,6 +50,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 		return err
 	}
 	if order != nil {
+		// todo: change plan for order
 		return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
 	}
 
@@ -59,13 +60,13 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
 				ORDER_ID,
 				ACCOUNT_ID, REGION, 
-				QUANTITIES, PLAN_ID, PLAN_TYPE, 
+				PLAN_ID, PLAN_TYPE, 
 				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
 				CREATOR, STATUS
 				) values (
 				?, 
 				?, ?, 
-				?, ?, ?, 
+				?, ?, 
 				'%s', '%s', '%s', 0,
 				?
 				)`, 
@@ -74,7 +75,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	_, err = db.Exec(sqlstr,
 				orderInfo.Order_id, 
 				orderInfo.Account_id, orderInfo.Region,  
-				orderInfo.Quantities, orderInfo.Plan_id, orderInfo.Plan_type, 
+				orderInfo.Plan_id, orderInfo.Plan_type, 
 				orderInfo.Creator, orderInfo.Status,  
 				)
 
@@ -327,7 +328,7 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 	sql_str := fmt.Sprintf(`select
 					ORDER_ID, 
 					ACCOUNT_ID, REGION, 
-					QUANTITIES, PLAN_ID, PLAN_TYPE,
+					PLAN_ID, PLAN_TYPE,
 					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
 					CREATOR, STATUS
 					from DF_PURCHASE_ORDER
@@ -351,7 +352,7 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 		err := rows.Scan(
 			&order.Order_id, 
 			&order.Account_id, &order.Region, 
-			&order.Quantities, &order.Plan_id, &order.Plan_type, 
+			&order.Plan_id, &order.Plan_type, 
 			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id,
 			&order.Creator, &order.Status, 
 		)

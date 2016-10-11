@@ -10,6 +10,7 @@ import (
 	"github.com/asiainfoLDP/datahub_commons/common"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
+	projectapi "github.com/openshift/origin/project/api/v1"
 )
 
 //======================================================
@@ -23,13 +24,18 @@ var (
 	ChargeSercice string
 )
 
-func BuildServiceUrlPrefixFromEnv(name string, addrEnv string) string {
+func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string) string {
 	addr := os.Getenv(addrEnv)
 	if addr == "" {
 		Logger.Fatalf("%s env should not be null", addrEnv)
 	}
 
-	prefix := fmt.Sprintf("http://%s", addr)
+	prefix := ""
+	if isHttps {
+		prefix = fmt.Sprintf("https://%s", addr)
+	} else {
+		prefix = fmt.Sprintf("http://%s", addr)
+	}
 
 	Logger.Infof("%s = %s", name, prefix)
 	
@@ -38,12 +44,12 @@ func BuildServiceUrlPrefixFromEnv(name string, addrEnv string) string {
 
 
 func initGateWay() {
-	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", "DATAFOUNDRY_HOST_ADDR")
+	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR")
 	openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
 
 
-	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", "PLAN_SERVICE_API_SERVER")
-	ChargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", "CHARGE_SERVICE_API_SERVER")
+	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "PLAN_SERVICE_API_SERVER")
+	ChargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "CHARGE_SERVICE_API_SERVER")
 }
 
 //================================================================
@@ -110,12 +116,23 @@ func getDFUserame(token string) (string, error) {
 // 
 //=======================================================================
 
-// todo: check user permission on project
+func getDFProject(usernameForLog, userToken, project string) (*projectapi.Project, error) {
+	p := &projectapi.Project{}
+	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	osRest.OGet("/oapi/v1/projects/"+project, p)
+	if osRest.Err != nil {
+		Logger.Infof("user (%s) get df project (%s) error: %s", usernameForLog, project, osRest.Err)
+		return nil, osRest.Err
+	}
+
+	return p, nil
+}
 
 //=======================================================================
 // 
 //=======================================================================
 
+// !!! plan types should contains "_", see genOrderID for details,
 const PLanType_Quota = "C"
 
 const PLanCircle_Month = "M"
@@ -153,20 +170,20 @@ func getPlanByID(planId string) (*Plan, error) {
 	
 	response, data, err := common.RemoteCall("GET", url, "", "")
 	if err != nil {
-		Logger.Debugf("getPlan error: ", err.Error())
+		Logger.Infof("getPlan error: ", err.Error())
 		return nil, err
 	}
 
 	// todo: use return code and msg instead
 	if response.StatusCode != http.StatusOK {
-		Logger.Debugf("remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		Logger.Infof("remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
 		return nil, fmt.Errorf("remote (%s) status code: %d.", url, response.StatusCode)
 	}
 
 	plan := new(Plan)
 	err = json.Unmarshal(data, plan)
 	if err != nil {
-		Logger.Debugf("authDF Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
+		Logger.Infof("authDF Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
 		return nil, err
 	}
 

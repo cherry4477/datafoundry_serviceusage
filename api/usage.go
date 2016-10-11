@@ -46,11 +46,17 @@ func genUUID() string {
 	return fmt.Sprintf("%X-%X-%X-%X-%X", bs[0:4], bs[4:6], bs[6:8], bs[8:10], bs[10:])
 }
 
-func genOrderID() string {
+func genOrderID(accountId, planType string) string {
+	switch planType {
+	case PLanType_Quota:
+		return fmt.Sprintf("%s-%s", accountId, planType)
+		// most one order allowed for such plan types
+	}
+
 	bs := make([]byte, 12)
 	_, err := rand.Read(bs)
 	if err != nil {
-		Logger.Warning("genOrderID error: ", err.Error())
+		Logger.Warning("genOrderID rand error: ", err.Error())
 
 		//mathrand.Read(bs)
 		n := time.Now().UnixNano()
@@ -128,8 +134,6 @@ func validateOrderStatus(statusName string) (int, *Error) {
 	switch statusName {
 	default:
 		return -1, newInvalidParameterError("invalid status parameter")
-	case "":
-		status = -1
 	case "pending":
 		status = usage.OrderStatus_Pending
 	case "consuming":
@@ -141,6 +145,21 @@ func validateOrderStatus(statusName string) (int, *Error) {
 	}
 
 	return status, nil
+}
+
+func orderStatusToLabel(status int) string {
+	switch status {
+	case usage.OrderStatus_Pending:
+		return "pending"
+	case usage.OrderStatus_Consuming:
+		return "consuming"
+	case usage.OrderStatus_Ending:
+		return "ending"
+	case usage.OrderStatus_Ended:
+		return "ended"
+	}
+
+	return ""
 }
 
 // ...
@@ -169,7 +188,7 @@ func canManagePurchaseOrders(username string) bool {
 type OrderCreation struct {
 	AccountID string    `json:"project,omitempty"`
 	PlanID    string    `json:"planId,omitempty"`
-	Creator   string    `json:"creator,omitempty"`
+	//Creator   string    `json:"creator,omitempty"`
 }
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -197,7 +216,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 
 	if !canManagePurchaseOrders(username) {
-		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
+		JsonResult(w, http.StatusForbidden, GetError(ErrorCodePermissionDenied), nil)
 		return
 	}
 
@@ -216,8 +235,15 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// todo: validate auth username accountId relation
+	// check if user can manipulate project or not
+	_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+		return
+	}
 
+	// if user is admin, ... (canceled)
+	/*
 	if orderCreation.Creator != "" {
 		orderCreation.Creator, e = validateUsername(orderCreation.AccountID)
 		if e != nil {
@@ -227,6 +253,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 		// todo: validate auth username must be admin
 	}
+	*/
+	creator := username
 
 	planId, e := validatePlanID(orderCreation.PlanID)
 	if e != nil {
@@ -252,7 +280,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	deadlineTime := now
 
 	order := &usage.PurchaseOrder{
-		Order_id: genOrderID(),
+		Order_id: genOrderID(accountId, planType),
 		Account_id: accountId,
 
 		Plan_id : planId,
@@ -264,6 +292,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		Deadline_time: deadlineTime,
 
 		Status: usage.OrderStatus_Pending,
+
+		Creator: creator,
 	}
 
 	err = usage.CreateOrder(db, order)
@@ -340,7 +370,12 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// todo: validate username accountId relation
+	// check if user can manipulate project or not
+	_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+	if err != nil {
+		JsonResult(w, http.StatusForbidden, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+		return
+	}
 
 	switch orderMod.Action {
 	default: 
@@ -366,11 +401,10 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
 	order := &usage.PurchaseOrder {
-		Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
+		Order_id: params.ByName("id"),
 		Account_id: r.FormValue("project"),
-		Region: "bj",
-		Quantities: 1,
-		Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
+		Region: "JD",
+		Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
 		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 		EndTime: nil,
 		Status: usage.OrderStatus_Consuming,
@@ -405,8 +439,12 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	// todo: check if username has the permission to view orders of accountId.
-	_, _ = username, accountId
+	// check if user can manipulate project or not
+	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+		return
+	}
 
 	// ...
 
@@ -416,7 +454,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	order, err := usage.RetrieveOrderByID(db, orderId)
+	order, err = usage.RetrieveOrderByID(db, orderId)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
@@ -431,7 +469,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "1111D98A-F7A1-EDF2-3DF7-B799333D2FD3",
 			Account_id: r.FormValue("project"),
 			Region: "AWS",
-			Quantities: 1,
 			Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -441,7 +478,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "2222D98A-F7A1-EDF2-3DF7-B799333D2FD5",
 			Account_id: r.FormValue("project"),
 			Region: "AWS",
-			Quantities: 1,
 			Plan_id: "2ECE9135-300A-9BB9-8163-5BC7D3F2748D",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -451,7 +487,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "3333D15C-73EF-3541-4BE7-0F6C1863249E",
 			Account_id: r.FormValue("project"),
 			Region: "AWS",
-			Quantities: 1,
 			Plan_id: "4810D15C-73EF-3541-4BE7-0F6C1863249E",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -461,7 +496,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "55557AB9-B59A-3A3C-4E0C-6463A2941231",
 			Account_id: r.FormValue("project"),
 			Region: "JD",
-			Quantities: 1,
 			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -471,7 +505,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "6666D98A-F7A1-EDF2-3DF7-B799333D1232",
 			Account_id: r.FormValue("project"),
 			Region: "JD",
-			Quantities: 1,
 			Plan_id: "672CEA95-781C-BF26-400D-A7BDF8E587FD",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -481,7 +514,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 			Order_id: "7777D98A-F7A1-EDF2-3DF7-B799333D1233",
 			Account_id: r.FormValue("project"),
 			Region: "JD",
-			Quantities: 1,
 			Plan_id: "29BA4085-B3B4-8308-2097-7A5340E770B9",
 			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
 			EndTime: nil,
@@ -492,7 +524,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
 	
 	return
-
 
 	// the real implementation
 
@@ -518,15 +549,22 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
-	// todo: check if username has the permission to view orders of accountId.
-	_, _ = username, accountId
+	// check if user can manipulate project or not
+	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+		return
+	}
 
 	// ...
 
-	status, e := validateOrderStatus(r.FormValue("status"))
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
+	status, statusLabel := -1, r.FormValue("status")
+	if statusLabel != "" {
+		status, e = validateOrderStatus(statusLabel)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
 	}
 	
 	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
@@ -537,6 +575,10 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
+	}
+
+	for _, o := range orders {
+		o.StatusLabel = orderStatusToLabel(o.Status)
 	}
 
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, orders))
@@ -612,8 +654,12 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	// todo: check if username has the permission to view orders of accountId.
-	_, _ = username, accountId
+	// check if user can manipulate project or not
+	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+		return
+	}
 
 	// ...
 
