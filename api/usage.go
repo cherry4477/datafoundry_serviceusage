@@ -559,19 +559,34 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	// ...
 
 	status, statusLabel := -1, r.FormValue("status")
-	if statusLabel != "" {
+	if statusLabel == "" {
+		status = usage.OrderStatus_Pending // zongsan: blank means pending
+	} else {
 		status, e = validateOrderStatus(statusLabel)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
 		}
 	}
+
+	// ...
+
+	region := r.FormValue("region")
+	if region != "" {
+		region, e = validateRegion(region)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+
+	// ...
 	
 	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-	count, orders, err := usage.QueryOrders(db, accountId, status, offset, size)
+	count, orders, err := usage.QueryOrders(db, accountId, region, status, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
@@ -675,7 +690,7 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 	// ...
 
 	region := r.FormValue("region")
-	if orderId != "" {
+	if region != "" {
 		region, e = validateRegion(region)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)

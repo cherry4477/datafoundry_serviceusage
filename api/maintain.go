@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"time"
+
+	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
 )
 
 //======================================================
@@ -12,7 +14,8 @@ import (
 func StartMaintaining() {
 	Logger.Infof("Maintaining started ...")
 
-	// find all consuming orders which dataline < now()+7_days.
+	// todo:
+	// find all consuming orders which deadline < now()+7_days.
 }
 
 //======================================================
@@ -22,7 +25,10 @@ func StartMaintaining() {
 func renewOrder(accountId, orderId string, plan *Plan) error {
 	// make a payment
 
-	// makePayment(accountId, plan.Price)
+	err := makePayment(openshift.AdminToken(), accountId, plan.Price)
+	if err != nil {
+		return err
+	} 
 
 	// todo: create a consuming report // need? maybe payment moodule has recoreded it.
 

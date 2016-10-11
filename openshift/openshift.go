@@ -11,6 +11,7 @@ import (
 	"time"
 	//"io"
 	//"os"
+	"sync/atomic"
 	"crypto/tls"
 	"encoding/base32"
 	"encoding/base64"
@@ -30,6 +31,10 @@ import (
 	//"github.com/ghodss/yaml"
 )
 
+func Init(dfHost, adminUser, adminPass string) {
+	theOC = createOpenshiftClient(dfHost, adminUser, adminPass)
+}
+
 //==============================================================
 //
 //==============================================================
@@ -40,8 +45,8 @@ func adminClient() *OpenshiftClient {
 	return theOC
 }
 
-func Init(dfHost, adminUser, adminPass string) {
-	theOC = createOpenshiftClient(dfHost, adminUser, adminPass)
+func AdminToken() string {
+	return theOC.BearerToken()
 }
 
 //==============================================================
@@ -55,9 +60,9 @@ func NewOpenshiftClient(token string) *OpenshiftClient {
 		host:    theOC.host,
 		oapiUrl: theOC.oapiUrl,
 		kapiUrl: theOC.kapiUrl,
-
-		bearerToken: token,
 	}
+
+	oc.setBearerToken(token)
 
 	return oc
 }
@@ -71,7 +76,8 @@ type OpenshiftClient struct {
 	namespace   string
 	username    string
 	password    string
-	bearerToken string
+	//bearerToken string
+	bearerToken atomic.Value
 }
 
 func httpsAddrMaker(addr string) string {
@@ -104,6 +110,15 @@ func createOpenshiftClient(host, username, password string) *OpenshiftClient {
 	return oc
 }
 
+func (oc *OpenshiftClient) BearerToken() string {
+	//return oc.bearerToken
+	return oc.bearerToken.Load().(string)
+}
+
+func (oc *OpenshiftClient) setBearerToken(token string) {
+	oc.bearerToken.Store(token)
+}
+
 func (oc *OpenshiftClient) updateBearerToken() {
 	for {
 		clientConfig := &kclient.Config{}
@@ -120,7 +135,8 @@ func (oc *OpenshiftClient) updateBearerToken() {
 			time.Sleep(15 * time.Second)
 		} else {
 			//clientConfig.BearerToken = token
-			oc.bearerToken = "Bearer " + token
+			//oc.bearerToken = "Bearer " + token
+			oc.setBearerToken("Bearer " + token)
 
 			println("RequestToken token: ", token)
 
@@ -130,7 +146,8 @@ func (oc *OpenshiftClient) updateBearerToken() {
 }
 
 func (oc *OpenshiftClient) request(method string, url string, body []byte, timeout time.Duration) (*http.Response, error) {
-	token := oc.bearerToken
+	//token := oc.bearerToken
+	token := oc.BearerToken()
 	if token == "" {
 		return nil, errors.New("token is blank")
 	}

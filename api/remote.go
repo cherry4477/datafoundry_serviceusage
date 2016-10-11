@@ -56,6 +56,8 @@ func initGateWay() {
 // 
 //================================================================
 
+// todo: modify the remote calling by using openshift API lib
+
 type ObjectMeta struct {
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
@@ -198,7 +200,7 @@ func getPlanByID(planId string) (*Plan, error) {
 
 // todo: send consume money request
 
-func makePayment(accountId string, money float64) error {
+func makePayment(adminToken, accountId string, money float32) error {
 	if Debug {
 		return nil
 	}

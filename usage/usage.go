@@ -193,7 +193,7 @@ func getSingleOrder(db DbOrTx, sqlWhere string) (*PurchaseOrder, error) {
 	return orders[0], nil
 }
 
-func QueryOrders(db DbOrTx, accountId string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
+func QueryOrders(db DbOrTx, accountId string, region string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
@@ -213,6 +213,14 @@ func QueryOrders(db DbOrTx, accountId string, status int, offset int64, limit in
 		} else {
 			sqlWhere = sqlWhere + fmt.Sprintf(" and STATUS=%d", status)
 		}
+	}
+	if region != "" {
+		if sqlWhere == "" {
+			sqlWhere = fmt.Sprintf("REGION=?", region)
+		} else {
+			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
+		}
+		sqlParams = append(sqlParams, region)
 	}
 
 	// ...
@@ -439,7 +447,7 @@ func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region 
 		sqlParams = append(sqlParams, orderId)
 	}
 	if region != "" {
-		sqlWhere = sqlWhere + " and REGION=?"
+		sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
 		sqlParams = append(sqlParams, region)
 	}
 
