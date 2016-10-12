@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"fmt"
 	"time"
+	"strings"
 
 	"github.com/asiainfoLDP/datahub_commons/common"
 
@@ -20,8 +21,9 @@ import (
 var (
 	DataFoundryHost string
 
-	PlanService   string
-	ChargeSercice string
+	PaymentService  string
+	PlanService     string
+	RechargeSercice string
 )
 
 func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string) string {
@@ -47,9 +49,9 @@ func initGateWay() {
 	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR")
 	openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
 
-
+	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, "PAYMENT_SERVICE_API_SERVER")
 	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "PLAN_SERVICE_API_SERVER")
-	ChargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "CHARGE_SERVICE_API_SERVER")
+	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "RECHARGE_SERVICE_API_SERVER")
 }
 
 //================================================================
@@ -150,9 +152,9 @@ func getDFProject(usernameForLog, userToken, project string) (*projectapi.Projec
 //=======================================================================
 
 // !!! plan types should contains "_", see genOrderID for details,
-const PLanType_Quota = "C"
+const PLanType_Quota = "c"
 
-const PLanCircle_Month = "M"
+const PLanCircle_Month = "m"
 
 type Plan struct {
 	Plan_id        string    `json:"plan_id,omitempty"`
@@ -191,19 +193,25 @@ func getPlanByID(planId string) (*Plan, error) {
 		return nil, err
 	}
 
-	// todo: use return code and msg instead
 	if response.StatusCode != http.StatusOK {
-		Logger.Infof("remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return nil, fmt.Errorf("remote (%s) status code: %d.", url, response.StatusCode)
+		Logger.Infof("getPlan remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		return nil, fmt.Errorf("getPlan remote (%s) status code: %d.", url, response.StatusCode)
 	}
 
 	plan := new(Plan)
 	result := Result{Data: plan}
 	err = json.Unmarshal(data, &result)
 	if err != nil {
-		Logger.Infof("authDF Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
+		Logger.Infof("getPlan Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
 		return nil, err
 	}
+
+	// ...
+
+	plan.Cycle = strings.ToLower(plan.Cycle)
+	plan.Plan_type = strings.ToLower(plan.Plan_type)
+
+	// ...
 
 	return plan, nil
 }
@@ -216,12 +224,30 @@ func getPlanByID(planId string) (*Plan, error) {
 
 // todo: send consume money request
 
-func makePayment(adminToken, accountId string, money float32) error {
+func makePayment(adminToken, accountId string, money float32, reason string) error {
 	if Debug {
 		return nil
 	}
+
+	body := fmt.Sprintf(
+		`{"namespace":"%s","amount":%.3f,"reason":"%s"}`, 
+		accountId,
+		money,
+		reason,
+		)
+	url := fmt.Sprintf("%s/charge/v1/recharge?type=deduction", RechargeSercice)
+	
+	//response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
+	response, data, err := common.RemoteCallWithJsonBody("POST", url, "", "", []byte(body))
+	if err != nil {
+		Logger.Infof("makePayment error: ", err.Error())
+		return err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		Logger.Infof("makePayment remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		return fmt.Errorf("makePayment remote (%s) status code: %d.", url, response.StatusCode)
+	}
 	
 	return nil
-
-	//return fmt.Errorf("not implemented")
 }

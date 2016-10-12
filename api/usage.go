@@ -319,7 +319,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 
 	// ...
-	err = renewOrder(accountId, order.Order_id, plan)
+	changeReason := fmt.Sprintf("order:%s:%d", order.Order_id, 1)
+	err = renewOrder(accountId, order.Order_id, plan, changeReason)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
 		

@@ -24,7 +24,7 @@ func StartMaintaining() {
 // 
 //======================================================
 
-func renewOrder(accountId, orderId string, plan *Plan) error {
+func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 	db := getDB()
 	if db == nil {
 		return fmt.Errorf("db not inited")
@@ -32,7 +32,7 @@ func renewOrder(accountId, orderId string, plan *Plan) error {
 
 	// ...
 
-	err := makePayment(openshift.AdminToken(), accountId, plan.Price)
+	err := makePayment(openshift.AdminToken(), accountId, plan.Price, reason)
 	if err != nil {
 		err2 := usage.IncreaseOrderRenewalFails(db, orderId)
 		if err2 != nil {

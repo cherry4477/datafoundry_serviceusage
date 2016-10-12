@@ -19,7 +19,7 @@ const (
 //=============================================================
 
 func RemoteCallWithBody(method, url string, token, user string, body []byte, contentType string) (*http.Response, []byte, error) {
-	log.DefaultLogger().Debugf("method: %s, url: %s, token: %s, contentType: %s, body: %s", method, url, token, contentType, string(body))
+	//log.DefaultLogger().Debugf("method: %s, url: %s, token: %s, contentType: %s, body: %s", method, url, token, contentType, string(body))
 	
 	var request *http.Request
 	var err error
@@ -28,6 +28,7 @@ func RemoteCallWithBody(method, url string, token, user string, body []byte, con
 	} else {
 		request, err = http.NewRequest(method, url, bytes.NewReader(body))
 	}
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -43,6 +44,7 @@ func RemoteCallWithBody(method, url string, token, user string, body []byte, con
 	client := &http.Client{
 		Timeout: time.Duration(GeneralRemoteCallTimeout) * time.Second,
 	}
+	
 	response, err := client.Do(request)
 	if response != nil {
 		defer response.Body.Close()
