@@ -25,38 +25,38 @@
 
 Body Parameters (json):
 ```
-project: 不可省略，当前用户必须属于此project中的一员。
-planId: 套餐Id，不可省略。
+namespace: 可省略，默认为当前用户名称
+plan_id: 套餐Id，不可省略。
 ```
 
 Return Result (json):
 ```
 code: 返回码
 msg: 返回信息
-data.orderId
+data.order_id
 data.project
 data.region
 data.quantities
-data.planId
-data.startTime
+data.plan_id
+data.start_time
 data.endTime: 只有订单已经被终止的时候存在
 data.status: "pending" | "consuming" | "ending" | "ended"。
 data.creator
 ```
 
-### PUT /usageapi/v1/orders/{orderId}
+### PUT /usageapi/v1/orders/{order_id}
 
 用户修改一个订单。
 
 Path Parameters:
 ```
-orderId: 订单号。
+order_id: 订单号。
 ```
 
 Body Parameters (json):
 ```
 action: 目前只支持cancel
-project: 帐户Id，不可省略，作校验用。
+namespace: 不可省略，作校验用
 ```
 
 Return Result (json):
@@ -65,42 +65,42 @@ code: 返回码
 msg: 返回信息
 ```
 
-### GET /usageapi/v1/orders/{orderId}?project={project}
+### GET /usageapi/v1/orders/{order_id}?namespace={namespace}
 
 用户查询某个订单
 
 Path Parameters:
 ```
-orderId: 订单号。
+order_id: 订单号。
 ```
 
 Query Parameters:
 ```
-project: 不可省略，作校验用。
+namespace: 不可省略，作校验用。
 ```
 
 Return Result (json):
 ```
 code: 返回码
 msg: 返回信息
-data.orderId
+data.order_id
 data.project
 data.region
 data.quantities
-data.planId
-data.startTime
-data.endTime: 只有订单已经被终止的时候存在
+data.plan_id
+data.start_time
+data.end_time: 只有订单已经被终止的时候存在
 data.status: "pending" | "consuming" | "ending" | "ended"
 data.creator
 ```
 
-### GET /usageapi/v1/orders?project={project}&status={status}&region={region}&page={page}&size={size}
+### GET /usageapi/v1/orders?namespace={namespace}&status={status}&region={region}&page={page}&size={size}
 
 用户查询订单列表
 
 Query Parameters:
 ```
-project: 被不可省略，作校验用。
+namespace: 不可省略，作校验用。
 status: 订单状态。"pending" | "consuming" | "ending" | "ended" | "renewalfailed"。可以缺省，表示consuming。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
@@ -113,27 +113,27 @@ code: 返回码
 msg: 返回信息
 data.total
 data.results
-data.results[0].orderId
-data.results[0].project
+data.results[0].order_id
+data.results[0].namespace
 data.results[0].region
 data.results[0].quantities
-data.results[0].planId
-data.results[0].startTime
-data.results[0].endTime: 只有订单已经被终止的时候存在
+data.results[0].plan_id
+data.results[0].start_time
+data.results[0].end_time: 只有订单已经被终止的时候存在
 data.results[0].status: "pending" | "consuming" | "ending" | "ended"
 data.results[0].creator
 ...
 
 ```
 
-### GET /usageapi/v1/usages?project={project}&order={order}&region={region}&page={page}&size={size}
+### GET /usageapi/v1/usages?namespace={namespace}&order={order}&region={region}&page={page}&size={size}
 
 当前用户查询历史消费记录。
 
 Query Parameters:
 ```
-project: 被查询的帐户，不可省略，作校验用。
-order: 订单号。可省略，表示project内的所有订单。
+namespace: 不可省略，作校验用。
+order: 订单号。可省略，表示namespace内的所有订单。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
@@ -145,12 +145,12 @@ code: 返回码
 msg: 返回信息
 data.total
 data.results
-data.results[0].orderId
-data.results[0].project
+data.results[0].order_id
+data.results[0].namespace
 data.results[0].region
 data.results[0].time
 data.results[0].money
-data.results[0].planId
+data.results[0].plan_id
 ...
 ```
 

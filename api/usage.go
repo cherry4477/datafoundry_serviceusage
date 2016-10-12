@@ -102,7 +102,7 @@ func validateOrderID(orderId string) (string, *Error) {
 
 func validateAccountID(accountId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
-	accountId, e := _mustStringParam("accountId", accountId, 50, StringParamType_UrlWord)
+	accountId, e := _mustStringParam("namespace", accountId, 50, StringParamType_UrlWord)
 	return accountId, e
 }
 
@@ -114,7 +114,7 @@ func validateUsername(accountId string) (string, *Error) {
 
 func validatePlanID(planId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
-	planId, e := _mustStringParam("planId", planId, 50, StringParamType_UrlWord)
+	planId, e := _mustStringParam("plan_id", planId, 50, StringParamType_UrlWord)
 	return planId, e
 }
 
@@ -195,8 +195,8 @@ func canManagePurchaseOrders(username string) bool {
 //==================================================================
 
 type OrderCreation struct {
-	AccountID string    `json:"project,omitempty"`
-	PlanID    string    `json:"planId,omitempty"`
+	AccountID string    `json:"namespace,omitempty"`
+	PlanID    string    `json:"plan_id,omitempty"`
 	//Creator   string    `json:"creator,omitempty"`
 }
 
@@ -238,17 +238,24 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	accountId, e := validateAccountID(orderCreation.AccountID)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
+	accountId := orderCreation.AccountID
+	if accountId == "" {
+		accountId = username
+	} else {
+		accountId, e = validateAccountID(accountId)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
 	}
 
 	// check if user can manipulate project or not
-	_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
-		return
+	if accountId != username {
+		_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+			return
+		}
 	}
 
 	// if user is admin, ... (canceled)
@@ -325,8 +332,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 }
 
 type OrderModification struct {
-	Action      string  `json:"action,omitempty"`
-	AccountID string    `json:"project,omitempty"`
+	Action    string  `json:"action,omitempty"`
+	AccountID string  `json:"namespace,omitempty"`
 }
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -360,7 +367,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	orderId, e := validateOrderID(params.ByName("id"))
+	orderId, e := validateOrderID(params.ByName("order_id"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -373,17 +380,24 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	accountId, e := validateAccountID(orderMod.AccountID)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
+	accountId := orderMod.AccountID
+	if accountId == "" {
+		accountId = username
+	} else {
+		accountId, e = validateAccountID(accountId)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
 	}
 
 	// check if user can manipulate project or not
-	_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
-	if err != nil {
-		JsonResult(w, http.StatusForbidden, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
-		return
+	if accountId != username {
+		_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+			return
+		}
 	}
 
 	switch orderMod.Action {
@@ -441,7 +455,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	accountId, e := validateAccountID(r.FormValue("project"))
+	accountId, e := validateAccountID(r.FormValue("namespace"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -456,7 +470,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	// ...
 
-	orderId, e := validateOrderID(params.ByName("id"))
+	orderId, e := validateOrderID(params.ByName("order_id"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -552,17 +566,24 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
-	accountId, e := validateAccountID(r.FormValue("project"))
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
+	accountId := r.FormValue("namespace")
+	if accountId == "" {
+		accountId = username
+	} else {
+		accountId, e = validateAccountID(accountId)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
 	}
 
 	// check if user can manipulate project or not
-	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
-		return
+	if accountId != username {
+		_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+			return
+		}
 	}
 
 	// ...
@@ -675,22 +696,29 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	accountId, e := validateAccountID(r.FormValue("project"))
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
+	accountId := r.FormValue("namespace")
+	if accountId == "" {
+		accountId = username
+	} else {
+		accountId, e = validateAccountID(accountId)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
 	}
 
 	// check if user can manipulate project or not
-	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
-		return
+	if accountId != username {
+		_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+			return
+		}
 	}
 
 	// ...
 
-	orderId := r.FormValue("orderId")
+	orderId := r.FormValue("order")
 	if orderId != "" {
 		orderId, e = validateOrderID(orderId)
 		if e != nil {

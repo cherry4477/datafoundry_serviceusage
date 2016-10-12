@@ -25,14 +25,14 @@ const (
 )
 
 type PurchaseOrder struct {
-	Order_id          string     `json:"orderId,omitempty"`
+	Order_id          string     `json:"order_id,omitempty"`
 	Account_id        string     `json:"project,omitempty"` // accountId
 	Region            string     `json:"region,omitempty"`
-	Plan_id           string     `json:"planId,omitempty"`
+	Plan_id           string     `json:"plan_id,omitempty"`
 	Plan_type         string     `json:"_,omitempty"`
-	Start_time        time.Time  `json:"startTime,omitempty"`
+	Start_time        time.Time  `json:"start_time,omitempty"`
 	End_time          time.Time  `json:"_,omitempty"`       // po 
-	EndTime           *time.Time `json:"endTime,omitempty"` // vo
+	EndTime           *time.Time `json:"end_time,omitempty"` // vo
 	Deadline_time     time.Time  `json:"deadline,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
 	Num_renew_retires int        `json:"_,omitempty"`
@@ -495,14 +495,14 @@ func MoneyToConsuming(money float32) int64 {
 }
 
 type ConsumeHistory struct {
-	Order_id          string    `json:"orderId,omitempty"`
+	Order_id          string    `json:"order_id,omitempty"`
 	Consume_id        int       `json:"_,omitempty"`
 	Consume_time      time.Time `json:"time,omitempty"`
 	Consuming         int64     `json:"_,omitempty"`       // po
 	Money             float32   `json:"money,omitempty"`   // vo, Money = Consuming * 0.0001
 	Account_id        string    `json:"project,omitempty"` // accountId
 	Region            string    `json:"region,omitempty"`
-	Plan_id           string    `json:"planId,omitempty"`
+	Plan_id           string    `json:"plan_id,omitempty"`
 }
 
 func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32) error {
