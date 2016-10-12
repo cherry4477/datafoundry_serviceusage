@@ -107,7 +107,7 @@ data.creator
 Query Parameters:
 ```
 project: 被不可省略，作校验用。
-status: 订单状态。"pending" | "consuming" | "ending" | "ended"。可以缺省，表示consuming。
+status: 订单状态。"pending" | "consuming" | "ending" | "ended" | "renewalfailed"。可以缺省，表示consuming。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
@@ -175,6 +175,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    END_TIME           DATETIME COMMENT 'invalid when status is consuming',
    DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
    LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
+   RENEW_RETRIES      TINYINT DEFAULT 0 COMMENT 'num renew fails, most 100',
    STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
    CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
    PRIMARY KEY (ORDER_ID)

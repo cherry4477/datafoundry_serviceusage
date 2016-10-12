@@ -35,6 +35,7 @@ type PurchaseOrder struct {
 	EndTime           *time.Time `json:"endTime,omitempty"` // vo
 	Deadline_time     time.Time  `json:"deadline,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
+	Num_renew_retires int        `json:"_,omitempty"`
 	Status            int        `json:"_,omitempty"`      // po
 	StatusLabel       string     `json:"status,omitempty"` // vo
 	Creator           string     `json:"creator,omitempty"`
@@ -62,13 +63,15 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				ACCOUNT_ID, REGION, 
 				PLAN_ID, PLAN_TYPE, 
 				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
-				CREATOR, STATUS
+				CREATOR, STATUS, 
+				RENEW_RETRIES
 				) values (
 				?, 
 				?, ?, 
 				?, ?, 
 				'%s', '%s', '%s', 0,
-				?
+				?, ?, 
+				0
 				)`, 
 				startTime, endTime, consumeTime,
 				)
@@ -82,20 +85,30 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	return err
 }
 
-func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) error {
+// todo: 
+// order table need more fields
+// > numRenewFails
+// > nex
+const DeadlineExtendedDuration_Month = time.Duration(-1)
+
+func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
+	return nil // todo
+}
+
+func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	order, err := RetrieveOrderByID(tx, orderId)
 	if err != nil {
 		tx.Rollback()
-		return err
+		return nil, err
 	}
 	if order == nil {
 		tx.Rollback()
-		return fmt.Errorf("order (id=%s) not found", orderId)
+		return nil, fmt.Errorf("order (id=%s) not found", orderId)
 	}
 
 	// need checking this? This function should be only called when a payment was just made.
@@ -109,7 +122,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) erro
 	order.Deadline_time = order.Deadline_time.Add(extendedDuration)
 	timestr := order.Deadline_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s' and STATUS=%d
+				DEADLINE_TIME='%s' and RENEW_RETRIES=0 and STATUS=%d
 				where ORDER_ID=?`, 
 				timestr,
 				OrderStatus_Consuming,
@@ -119,7 +132,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) erro
 				)
 	_ = result
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	//n, _ := result.RowsAffected()
@@ -129,10 +142,10 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) erro
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return order, nil
 }
 
 func EndOrder(db *sql.DB, orderId string, accountId string) error {
@@ -193,7 +206,7 @@ func getSingleOrder(db DbOrTx, sqlWhere string) (*PurchaseOrder, error) {
 	return orders[0], nil
 }
 
-func QueryOrders(db DbOrTx, accountId string, region string, status int, offset int64, limit int) (int64, []*PurchaseOrder, error) {
+func QueryOrders(db DbOrTx, accountId string, region string, status int, renewalFailedOnly bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
@@ -221,6 +234,13 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, offset 
 			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
 		}
 		sqlParams = append(sqlParams, region)
+	}
+	if renewalFailedOnly {
+		if sqlWhere == "" {
+			sqlWhere = "RENEW_RETRIES>0"
+		} else {
+			sqlWhere = sqlWhere + " and RENEW_RETRIES>0"
+		}
 	}
 
 	// ...
@@ -338,7 +358,8 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 					ACCOUNT_ID, REGION, 
 					PLAN_ID, PLAN_TYPE,
 					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
-					CREATOR, STATUS
+					CREATOR, STATUS, 
+					RENEW_RETRIES
 					from DF_PURCHASE_ORDER
 					%s
 					limit %d
@@ -363,6 +384,7 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 			&order.Plan_id, &order.Plan_type, 
 			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id,
 			&order.Creator, &order.Status, 
+			&order.Num_renew_retires,
 		)
 		if err != nil {
 			return nil, err
@@ -377,20 +399,14 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 }
 
 //==================================================================
-// auto renew
-//==================================================================
-
-// TODO: extend order deadline
-
-//==================================================================
 // reports
 //==================================================================
 
-func ConsumingToMoney(consuming int64) float64 {
-	return 0.0001 * float64(consuming) // DON"T CHANGE
+func ConsumingToMoney(consuming int64) float32 {
+	return 0.0001 * float32(consuming) // DON"T CHANGE
 }
 
-func MoneyToConsuming(money float64) int64 {
+func MoneyToConsuming(money float32) int64 {
 	return int64(money * 10000) // DON"T CHANGE
 }
 
@@ -399,13 +415,13 @@ type ConsumeHistory struct {
 	Consume_id        int       `json:"_,omitempty"`
 	Consume_time      time.Time `json:"time,omitempty"`
 	Consuming         int64     `json:"_,omitempty"`       // po
-	Money             float64   `json:"money,omitempty"`   // vo, Money = Consuming * 0.0001
+	Money             float32   `json:"money,omitempty"`   // vo, Money = Consuming * 0.0001
 	Account_id        string    `json:"project,omitempty"` // accountId
 	Region            string    `json:"region,omitempty"`
 	Plan_id           string    `json:"planId,omitempty"`
 }
 
-func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeId int, consumeTime time.Time, money float64) error {
+func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32) error {
 	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
 	if err != nil {
 		return err
@@ -425,7 +441,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeId int, c
 				%d, '%s', 
 				'%s', '%s', '%s'
 				)`, 
-				orderInfo.Order_id, consumeId,
+				orderInfo.Order_id, orderInfo.Last_consume_id,
 				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, 
 				)

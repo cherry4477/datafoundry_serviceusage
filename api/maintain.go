@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
+
+	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
 
 //======================================================
@@ -23,12 +25,24 @@ func StartMaintaining() {
 //======================================================
 
 func renewOrder(accountId, orderId string, plan *Plan) error {
-	// make a payment
+	db := getDB()
+	if db == nil {
+		return fmt.Errorf("db not inited")
+	}
+
+	// ...
 
 	err := makePayment(openshift.AdminToken(), accountId, plan.Price)
 	if err != nil {
+		err2 := usage.IncreaseOrderRenewalFails(db, orderId)
+		if err2 != nil {
+			Logger.Errorf("IncreaseOrderRenewalFails error: %s", err2.Error())
+		}
+
 		return err
-	} 
+	}
+
+	now := time.Now()
 
 	// todo: create a consuming report // need? maybe payment moodule has recoreded it.
 
@@ -39,10 +53,20 @@ func renewOrder(accountId, orderId string, plan *Plan) error {
 	default:
 		return fmt.Errorf("unknown plan cycle: %s", plan.Cycle)
 	case PLanCircle_Month:
-		_ = extendedDuration
+		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
 
-	// usage.RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration)
+	order, err := usage.RenewOrder(db, orderId, extendedDuration)
+	if err != nil {
+		// todo: retry
+		return err
+	}
+
+	err = usage.CreateConsumeHistory(db, order, now, plan.Price)
+	if err != nil {
+		// todo: retry
+		return err
+	}
 
 	return nil
 }

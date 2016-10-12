@@ -128,19 +128,28 @@ func validateRegion(region string) (string, *Error) {
 	return region, nil
 }
 
+const (
+	OrderStatusLabel_Pending   = "pending"
+	OrderStatusLabel_Consuming = "consuming"
+	OrderStatusLabel_Ending    = "ending"
+	OrderStatusLabel_Ended     = "ended"
+
+	OrderStatusLabel_RenewalFailed = "renewfailed" // fake label
+)
+
 func validateOrderStatus(statusName string) (int, *Error) {
 	var status = -1
 
 	switch statusName {
 	default:
 		return -1, newInvalidParameterError("invalid status parameter")
-	case "pending":
+	case OrderStatusLabel_Pending:
 		status = usage.OrderStatus_Pending
-	case "consuming":
+	case OrderStatusLabel_Consuming, OrderStatusLabel_RenewalFailed:
 		status = usage.OrderStatus_Consuming
-	case "ending":
+	case OrderStatusLabel_Ending:
 		status = usage.OrderStatus_Ending
-	case "ended":
+	case OrderStatusLabel_Ended:
 		status = usage.OrderStatus_Ended
 	}
 
@@ -150,13 +159,13 @@ func validateOrderStatus(statusName string) (int, *Error) {
 func orderStatusToLabel(status int) string {
 	switch status {
 	case usage.OrderStatus_Pending:
-		return "pending"
+		return OrderStatusLabel_Pending
 	case usage.OrderStatus_Consuming:
-		return "consuming"
+		return OrderStatusLabel_Consuming
 	case usage.OrderStatus_Ending:
-		return "ending"
+		return OrderStatusLabel_Ending
 	case usage.OrderStatus_Ended:
-		return "ended"
+		return OrderStatusLabel_Ended
 	}
 
 	return ""
@@ -569,6 +578,8 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		}
 	}
 
+	renewalFailedOnly := statusLabel == OrderStatusLabel_RenewalFailed
+
 	// ...
 
 	region := r.FormValue("region")
@@ -586,7 +597,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-	count, orders, err := usage.QueryOrders(db, accountId, region, status, offset, size)
+	count, orders, err := usage.QueryOrders(db, accountId, region, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
