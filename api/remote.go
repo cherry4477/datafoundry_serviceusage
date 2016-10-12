@@ -231,14 +231,11 @@ func makePayment(adminToken, accountId string, money float32, reason string) err
 
 	body := fmt.Sprintf(
 		`{"namespace":"%s","amount":%.3f,"reason":"%s"}`, 
-		accountId,
-		money,
-		reason,
+		accountId, money, reason,
 		)
 	url := fmt.Sprintf("%s/charge/v1/recharge?type=deduction", RechargeSercice)
 	
-	//response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
-	response, data, err := common.RemoteCallWithJsonBody("POST", url, "", "", []byte(body))
+	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {
 		Logger.Infof("makePayment error: ", err.Error())
 		return err
