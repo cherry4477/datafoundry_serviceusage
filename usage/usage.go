@@ -117,11 +117,56 @@ func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.T
 	return t.Add(extended)
 }
 
-// todo: 
-func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
-	return nil // todo
+const MaxNumRenewalRetries = 100
 
-	// RENEW_RETRIES <= 100
+func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	order, err := RetrieveOrderByID(tx, orderId)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	if order == nil {
+		tx.Rollback()
+		return fmt.Errorf("order (id=%s) not found", orderId)
+	}
+
+	if order.Num_renew_retires >= MaxNumRenewalRetries {
+		tx.Rollback()
+		return nil
+	}
+
+	order.Num_renew_retires ++
+
+	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+				RENEW_RETRIES=%d
+				where ORDER_ID=?`, 
+				order.Num_renew_retires,
+				)
+
+	result, err := tx.Exec(sqlstr,
+				orderId,
+				)
+	_ = result
+	if err != nil {
+		return err
+	}
+
+	//n, _ := result.RowsAffected()
+	//if n < 1 {
+	//	return fmt.Errorf("order (%s) not found", orderId)
+	//}
+
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	
+	return nil
 }
 
 func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
@@ -169,7 +214,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 
 	//n, _ := result.RowsAffected()
 	//if n < 1 {
-	//	return fmt.Errorf("order (%s) not found", orderId)
+	//	return nil, fmt.Errorf("order (%s) not found", orderId)
 	//}
 
 	err = tx.Commit()
