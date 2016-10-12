@@ -202,10 +202,10 @@ type OrderCreation struct {
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
-	
-	return
-
+	//JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
+	//
+	//return
+	//
 	// the real implementation
 
 	// ...
@@ -224,10 +224,10 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	if !canManagePurchaseOrders(username) {
-		JsonResult(w, http.StatusForbidden, GetError(ErrorCodePermissionDenied), nil)
-		return
-	}
+	//if !canManagePurchaseOrders(username) {
+	//	JsonResult(w, http.StatusForbidden, GetError(ErrorCodePermissionDenied), nil)
+	//	return
+	//}
 
 	// ...
 
@@ -331,10 +331,10 @@ type OrderModification struct {
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	JsonResult(w, http.StatusOK, nil, nil)
-	
-	return
-
+	//JsonResult(w, http.StatusOK, nil, nil)
+	//
+	//return
+	//
 	// the real implementation
 
 	// ...
@@ -353,10 +353,10 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	if !canManagePurchaseOrders(username) {
-		JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
-		return
-	}
+	//if !canManagePurchaseOrders(username) {
+	//	JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
+	//	return
+	//}
 
 	// ...
 
@@ -409,21 +409,20 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	order := &usage.PurchaseOrder {
-		Order_id: params.ByName("id"),
-		Account_id: r.FormValue("project"),
-		Region: "JD",
-		Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
-		Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-		EndTime: nil,
-		Status: usage.OrderStatus_Consuming,
-	}
-
-	JsonResult(w, http.StatusOK, nil, order)
-	
-	return
-
-
+	//order := &usage.PurchaseOrder {
+	//	Order_id: params.ByName("id"),
+	//	Account_id: r.FormValue("project"),
+	//	Region: "JD",
+	//	Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
+	//	Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
+	//	EndTime: nil,
+	//	Status: usage.OrderStatus_Consuming,
+	//}
+	//
+	//JsonResult(w, http.StatusOK, nil, order)
+	//
+	//return
+	//
 	// the real implementation
 
 	// ...
@@ -463,7 +462,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	order, err = usage.RetrieveOrderByID(db, orderId)
+	order, err := usage.RetrieveOrderByID(db, orderId)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
@@ -473,6 +472,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	/*
 	orders := []*usage.PurchaseOrder {
 		{
 			Order_id: "1111D98A-F7A1-EDF2-3DF7-B799333D2FD3",
@@ -533,7 +533,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
 	
 	return
-
+	*/
 	// the real implementation
 
 	// ...
@@ -569,7 +569,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	status, statusLabel := -1, r.FormValue("status")
 	if statusLabel == "" {
-		status = usage.OrderStatus_Pending // zongsan: blank means pending
+		status = usage.OrderStatus_Consuming // zongsan: blank means consuming
 	} else {
 		status, e = validateOrderStatus(statusLabel)
 		if e != nil {
@@ -633,6 +633,7 @@ func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedRepo
 */
 
 func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	/*
 	consumings := []*usage.ConsumeHistory {
 		{
 			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
@@ -655,7 +656,7 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, consumings))
 
 	return
-
+	*/
 	// the real implementation
 
 	// ...

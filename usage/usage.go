@@ -91,10 +91,42 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 // > nex
 const DeadlineExtendedDuration_Month = time.Duration(-1)
 
-func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
-	return nil // todo
+func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.Time {
+	switch extended {
+	case DeadlineExtendedDuration_Month:
+		y := t.Year()
+		m := t.Month() + 1
+		d := startTime.Day()
+		if m > time.December {
+			y++
+			m = time.January
+		}
+		next := time.Date(y, m, 0, 0, 0, 0, 0, time.UTC)
+		if d >= next.Day() {
+			d = next.Day() - 1
+		}
+		next = time.Date(y, m, d, 
+			startTime.Hour(), startTime.Minute(), startTime.Second(), startTime.Nanosecond(), 
+			time.FixedZone(startTime.Zone()))
+
+		//fmt.Println("=== startTime = ", startTime)
+		//fmt.Println("=== t = ", t)
+		//fmt.Println("=== next = ", next)
+
+		return next
+	}
+
+	return t.Add(extended)
 }
 
+// todo: 
+func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
+	return nil // todo
+
+	// RENEW_RETRIES <= 100
+}
+
+// todo: update Next_Consume_Time
 func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -111,6 +143,8 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		return nil, fmt.Errorf("order (id=%s) not found", orderId)
 	}
 
+	order.Deadline_time = extendTime(order.Deadline_time, extendedDuration, order.Start_time)
+
 	// need checking this? This function should be only called when a payment was just made.
 	//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
 	//	tx.Rollback()
@@ -122,11 +156,12 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 	order.Deadline_time = order.Deadline_time.Add(extendedDuration)
 	timestr := order.Deadline_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s' and RENEW_RETRIES=0 and STATUS=%d
+				DEADLINE_TIME='%s', RENEW_RETRIES=0, STATUS=%d
 				where ORDER_ID=?`, 
 				timestr,
 				OrderStatus_Consuming,
 				)
+
 	result, err := tx.Exec(sqlstr,
 				orderId,
 				)
@@ -186,7 +221,7 @@ func EndOrder(db *sql.DB, orderId string, accountId string) error {
 }
 
 func RetrieveOrderByID(db DbOrTx, orderId string) (*PurchaseOrder, error) {
-	return getSingleOrder(db, fmt.Sprintf("where ORDER_ID='%s'", orderId))
+	return getSingleOrder(db, fmt.Sprintf("ORDER_ID='%s'", orderId))
 }
 
 func getSingleOrder(db DbOrTx, sqlWhere string) (*PurchaseOrder, error) {
@@ -318,7 +353,7 @@ func getOrderList(db DbOrTx, offset int64, limit int, sqlWhere string, sqlSort s
 	//	return 0, nil, errors.New("sqlWhere can't be blank")
 	//}
 
-	count, err := queryOrdersCount(db, sqlWhere)
+	count, err := queryOrdersCount(db, sqlWhere, sqlParams...)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -343,12 +378,18 @@ func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int
 
 	count := int64(0)
 	sql_str := fmt.Sprintf(`select COUNT(*) from DF_PURCHASE_ORDER %s`, sql_where_all)
+
 	err := db.QueryRow(sql_str, sqlParams...).Scan(&count)
 
 	return count, err
 }
 
-func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
+func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
+	sqlWhere = strings.TrimSpace(sqlWhere)
+	sql_where_all := ""
+	if sqlWhere != "" {
+		sql_where_all = fmt.Sprintf("where %s", sqlWhere)
+	}
 	offset_str := ""
 	if offset > 0 {
 		offset_str = fmt.Sprintf("offset %d", offset)
@@ -365,9 +406,10 @@ func queryOrders(db DbOrTx, sqlWhereAll string, limit int, offset int64, sqlPara
 					limit %d
 					%s
 					`,
-		sqlWhereAll,
+		sql_where_all,
 		limit,
 		offset_str)
+
 	rows, err := db.Query(sql_str, sqlParams...)
 
 	if err != nil {
@@ -422,14 +464,6 @@ type ConsumeHistory struct {
 }
 
 func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32) error {
-	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
-	if err != nil {
-		return err
-	}
-	if order != nil {
-		return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
-	}
-
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
@@ -437,7 +471,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 				CONSUMING, CONSUME_TIME,
 				ACCOUNT_ID, REGION, PLAN_ID
 				) values (
-				%d, %d, 
+				'%s', %d, 
 				%d, '%s', 
 				'%s', '%s', '%s'
 				)`, 
@@ -445,7 +479,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, 
 				)
-	_, err = db.Exec(sqlstr)
+	_, err := db.Exec(sqlstr)
 
 	return err
 }
@@ -485,7 +519,7 @@ func getConsumingList(db *sql.DB, offset int64, limit int, sqlWhere string, sqlS
 	//	return 0, nil, errors.New("sqlWhere can't be blank")
 	//}
 
-	count, err := queryConsumingsCount(db, sqlWhere)
+	count, err := queryConsumingsCount(db, sqlWhere, sqlParams...)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -515,7 +549,12 @@ func queryConsumingsCount(db *sql.DB, sqlWhere string, sqlParams ...interface{})
 	return count, err
 }
 
-func queryConsumings(db *sql.DB, sqlWhereAll string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
+func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
+	sqlWhere = strings.TrimSpace(sqlWhere)
+	sql_where_all := ""
+	if sqlWhere != "" {
+		sql_where_all = fmt.Sprintf("where %s", sqlWhere)
+	}
 	offset_str := ""
 	if offset > 0 {
 		offset_str = fmt.Sprintf("offset %d", offset)
@@ -529,7 +568,7 @@ func queryConsumings(db *sql.DB, sqlWhereAll string, limit int, offset int64, sq
 					limit %d
 					%s
 					`,
-		sqlWhereAll,
+		sql_where_all,
 		limit,
 		offset_str)
 	rows, err := db.Query(sql_str, sqlParams...)

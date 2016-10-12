@@ -46,7 +46,7 @@ data.creator
 
 ### PUT /usageapi/v1/orders/{orderId}
 
-管理员（修改一个服务实例的时候）修改一个订单。
+用户修改一个订单。
 
 Path Parameters:
 ```
@@ -67,10 +67,7 @@ msg: 返回信息
 
 ### GET /usageapi/v1/orders/{orderId}?project={project}
 
-(一般情况下，用户不应该调用这个接口，用户看到的应该是服务实例。一个服务实例对应一个订单)
-
-1. 管理员查询任何一个订单详情。
-1. 当前用户查询自己帐户的一个订单详情。
+用户查询某个订单
 
 Path Parameters:
 ```
@@ -99,10 +96,7 @@ data.creator
 
 ### GET /usageapi/v1/orders?project={project}&status={status}&region={region}&page={page}&size={size}
 
-(一般情况下，用户不应该调用这个接口，用户看到的应该是服务实例列表。每个服务实例对应一个订单)
-
-1. 管理员查询任何帐户的订单列表。
-1. 当前用户查询自己帐户的订单列表。
+用户查询订单列表
 
 Query Parameters:
 ```
@@ -134,8 +128,7 @@ data.results[0].creator
 
 ### GET /usageapi/v1/usages?project={project}&order={order}&region={region}&page={page}&size={size}
 
-1. 管理员查询任何订单的历史消费记录。
-1. 当前用户查询自己订单的历史消费记录。
+当前用户查询历史消费记录。
 
 Query Parameters:
 ```
@@ -186,7 +179,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 ```
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
-   ORDER_ID           VARCHAR(64) NOT NULL,th, day, etc',
+   ORDER_ID           VARCHAR(64) NOT NULL,
    CONSUME_ID         INT,
    CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
    CONSUME_TIME       DATETIME,

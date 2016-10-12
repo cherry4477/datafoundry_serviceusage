@@ -31,6 +31,7 @@ func TimeoutHandleWithMessage(h httprouter.Handle, dt time.Duration, msg string)
 			h(tw, r, params)
 			done <- true
 		}()
+
 		select {
 		case <-done:
 			return

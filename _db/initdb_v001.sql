@@ -1,3 +1,31 @@
+CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
+(
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
+   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   PLAN_ID            VARCHAR(64) NOT NULL,
+   PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
+   START_TIME         DATETIME,
+   END_TIME           DATETIME COMMENT 'invalid when status is consuming',
+   DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
+   LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
+   RENEW_RETRIES      TINYINT DEFAULT 0 COMMENT 'num renew fails, most 100',
+   STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
+   CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
+   PRIMARY KEY (ORDER_ID)
+)  DEFAULT CHARSET=UTF8;
+
+CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
+(
+   ORDER_ID           VARCHAR(64) NOT NULL,
+   CONSUME_ID         INT,
+   CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
+   CONSUME_TIME       DATETIME,
+   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
+   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
+   PRIMARY KEY (ORDER_ID, CONSUME_ID)
+)  DEFAULT CHARSET=UTF8;
 
 CREATE TABLE IF NOT EXISTS DF_ITEM_STAT
 (

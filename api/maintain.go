@@ -14,7 +14,7 @@ import (
 //======================================================
 
 func StartMaintaining() {
-	Logger.Infof("Maintaining started ...")
+	Logger.Infof("Maintaining service started.")
 
 	// todo:
 	// find all consuming orders which deadline < now()+7_days.
@@ -49,6 +49,7 @@ func renewOrder(accountId, orderId string, plan *Plan) error {
 	// change order status => consuming // will do in renew
 	
 	var extendedDuration time.Duration
+
 	switch plan.Cycle {
 	default:
 		return fmt.Errorf("unknown plan cycle: %s", plan.Cycle)
@@ -59,12 +60,16 @@ func renewOrder(accountId, orderId string, plan *Plan) error {
 	order, err := usage.RenewOrder(db, orderId, extendedDuration)
 	if err != nil {
 		// todo: retry
+
+		Logger.Errorf("RenewOrder error: %s", err.Error())
 		return err
 	}
 
 	err = usage.CreateConsumeHistory(db, order, now, plan.Price)
 	if err != nil {
 		// todo: retry
+
+		Logger.Errorf("CreateConsumeHistory error: %s", err.Error())
 		return err
 	}
 

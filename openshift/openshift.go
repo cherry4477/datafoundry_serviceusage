@@ -104,7 +104,8 @@ func createOpenshiftClient(host, username, password string) *OpenshiftClient {
 		username: username,
 		password: password,
 	}
-
+	oc.bearerToken.Store("")
+	
 	go oc.updateBearerToken()
 
 	return oc
@@ -282,6 +283,8 @@ func (osr *OpenshiftREST) doRequest(method, url string, bodyParams interface{}, 
 			return osr
 		}
 	}
+
+	//println("11111 method = ", method, ", url = ", url)
 
 	//res, osr.Err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
 	res, err := osr.oc.request(method, url, body, GeneralRequestTimeout)

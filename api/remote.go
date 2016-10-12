@@ -75,6 +75,7 @@ type User struct {
 	Groups []string `json:"groups"`
 }
 
+/*
 func authDF(token string) (*User, error) {
 	url := fmt.Sprintf("%s/oapi/v1/users/~", DataFoundryHost)
 
@@ -99,6 +100,19 @@ func authDF(token string) (*User, error) {
 
 	return user, nil
 }
+*/
+func authDF(userToken string) (*User, error) {
+	u := &User{}
+	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	uri := "/users/~"
+	osRest.OGet(uri, u)
+	if osRest.Err != nil {
+		Logger.Infof("authDF, uri(%s) error: %s", uri, osRest.Err)
+		return nil, osRest.Err
+	}
+
+	return u, nil
+}
 
 func dfUser(user *User) string {
 	return user.Name
@@ -121,9 +135,10 @@ func getDFUserame(token string) (string, error) {
 func getDFProject(usernameForLog, userToken, project string) (*projectapi.Project, error) {
 	p := &projectapi.Project{}
 	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
-	osRest.OGet("/oapi/v1/projects/"+project, p)
+	uri := "/projects/"+project
+	osRest.OGet(uri, p)
 	if osRest.Err != nil {
-		Logger.Infof("user (%s) get df project (%s) error: %s", usernameForLog, project, osRest.Err)
+		Logger.Infof("user (%s) get df project (%s), uri(%s) error: %s", usernameForLog, project, uri, osRest.Err)
 		return nil, osRest.Err
 	}
 
@@ -183,7 +198,8 @@ func getPlanByID(planId string) (*Plan, error) {
 	}
 
 	plan := new(Plan)
-	err = json.Unmarshal(data, plan)
+	result := Result{Data: plan}
+	err = json.Unmarshal(data, &result)
 	if err != nil {
 		Logger.Infof("authDF Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
 		return nil, err
@@ -204,6 +220,8 @@ func makePayment(adminToken, accountId string, money float32) error {
 	if Debug {
 		return nil
 	}
+	
+	return nil
 
-	return fmt.Errorf("not implemented")
+	//return fmt.Errorf("not implemented")
 }
