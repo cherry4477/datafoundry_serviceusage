@@ -591,7 +591,9 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	status, statusLabel := -1, r.FormValue("status")
 	if statusLabel == "" {
-		status = usage.OrderStatus_Consuming // zongsan: blank means consuming
+		// status = usage.OrderStatus_Consuming 
+		// zongsan: blank means consuming
+		// cancelled
 	} else {
 		status, e = validateOrderStatus(statusLabel)
 		if e != nil {
