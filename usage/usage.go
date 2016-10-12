@@ -85,10 +85,8 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	return err
 }
 
-// todo: 
-// order table need more fields
-// > numRenewFails
-// > nex
+//=============
+
 const DeadlineExtendedDuration_Month = time.Duration(-1)
 
 func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.Time {
@@ -126,7 +124,6 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 	// RENEW_RETRIES <= 100
 }
 
-// todo: update Next_Consume_Time
 func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -156,9 +153,9 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 	order.Deadline_time = order.Deadline_time.Add(extendedDuration)
 	timestr := order.Deadline_time.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s', RENEW_RETRIES=0, STATUS=%d
+				DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, RENEW_RETRIES=0, STATUS=%d
 				where ORDER_ID=?`, 
-				timestr,
+				timestr, order.Last_consume_id+1,
 				OrderStatus_Consuming,
 				)
 
