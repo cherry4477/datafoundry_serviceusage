@@ -73,9 +73,9 @@ func genOrderID(accountId, planType string) string {
 	return string(base64.RawURLEncoding.EncodeToString(bs))
 }
 
-func buildOrderID(accountId, planType string) string {
-	return fmt.Sprintf("%s_%s", accountId, planType)
-}
+//func buildOrderID(accountId, planType string) string {
+//	return fmt.Sprintf("%s_%s", accountId, planType)
+//}
 
 //==================================================================
 //
