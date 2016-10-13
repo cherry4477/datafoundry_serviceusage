@@ -356,7 +356,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	if sqlWhere == "" {
 		sqlWhere = "EVER_PAYED=1"
 	} else {
-		sqlWhere = sqlWhere + " and VER_PAYED=1"
+		sqlWhere = sqlWhere + " and EVER_PAYED=1"
 	}
 
 	// ...
