@@ -122,6 +122,9 @@ func dfUser(user *User) string {
 
 func getDFUserame(token string) (string, error) {
 	//Logger.Info("token = ", token)
+	//if Debug {
+	//	return "liuxu", nil
+	//}
 
 	user, err := authDF(token)
 	if err != nil {

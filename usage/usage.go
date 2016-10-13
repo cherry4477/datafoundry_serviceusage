@@ -463,7 +463,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 	if sqlWhere == "" {
 		sqlWhere = "EVER_PAYED=1"
 	} else {
-		sqlWhere = sqlWhere + " and EVER_PAYED=1"
+		sqlWhere = "EVER_PAYED=1 and " + sqlWhere
 	}
 
 	sql_where_all := ""
@@ -490,6 +490,8 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 		sql_where_all,
 		limit,
 		offset_str)
+	
+	// println("sql_str = ", sql_str)
 
 	rows, err := db.Query(sql_str, sqlParams...)
 
