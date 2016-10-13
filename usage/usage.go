@@ -51,6 +51,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	if err != nil {
 		return err
 	}
+
 	if order != nil {
 		if order.Status != OrderStatus_Consuming {
 			// delete old order
@@ -293,6 +294,7 @@ func EndOrder(db *sql.DB, orderId string, accountId string) error {
 }
 
 func RetrieveOrderByID(db DbOrTx, orderId string) (*PurchaseOrder, error) {
+	// todo: use ? instead
 	return getSingleOrder(db, fmt.Sprintf("ORDER_ID='%s'", orderId))
 }
 
@@ -348,6 +350,13 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		} else {
 			sqlWhere = sqlWhere + " and RENEW_RETRIES>0"
 		}
+	}
+
+	// filter out pending orders
+	if sqlWhere == "" {
+		sqlWhere = "EVER_PAYED=1"
+	} else {
+		sqlWhere = sqlWhere + " and VER_PAYED=1"
 	}
 
 	// ...
@@ -443,6 +452,7 @@ func getOrderList(db DbOrTx, offset int64, limit int, sqlWhere string, sqlSort s
 
 func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int64, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
+
 	sql_where_all := ""
 	if sqlWhere != "" {
 		sql_where_all = fmt.Sprintf("where %s", sqlWhere)
@@ -458,13 +468,6 @@ func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int
 
 func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
-
-	// filter out pending orders
-	if sqlWhere == "" {
-		sqlWhere = "EVER_PAYED=1"
-	} else {
-		sqlWhere = "EVER_PAYED=1 and " + sqlWhere
-	}
 
 	sql_where_all := ""
 	if sqlWhere != "" {
