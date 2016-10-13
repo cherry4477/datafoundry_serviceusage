@@ -31,10 +31,11 @@ type PurchaseOrder struct {
 	Plan_id           string     `json:"plan_id,omitempty"`
 	Plan_type         string     `json:"_,omitempty"`
 	Start_time        time.Time  `json:"start_time,omitempty"`
-	End_time          time.Time  `json:"_,omitempty"`       // po 
+	End_time          time.Time  `json:"_,omitempty"`        // po
 	EndTime           *time.Time `json:"end_time,omitempty"` // vo
 	Deadline_time     time.Time  `json:"deadline,omitempty"`
 	Last_consume_id   int        `json:"_,omitempty"`
+	Ever_payed        int        `json:"_,omitempty"`
 	Num_renew_retires int        `json:"_,omitempty"`
 	Status            int        `json:"_,omitempty"`      // po
 	StatusLabel       string     `json:"status,omitempty"` // vo
@@ -51,8 +52,17 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 		return err
 	}
 	if order != nil {
-		// todo: change plan for order
-		return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
+		if order.Status != OrderStatus_Consuming {
+			// delete old order
+			err = RemoveOrder(db, orderInfo.Order_id)
+			if err != nil {
+				return err
+			}
+		} else {
+			// todo: change plan for order
+
+			return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
+		}
 	}
 
 	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
@@ -62,14 +72,14 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				ORDER_ID,
 				ACCOUNT_ID, REGION, 
 				PLAN_ID, PLAN_TYPE, 
-				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
+				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
 				CREATOR, STATUS, 
 				RENEW_RETRIES
 				) values (
 				?, 
 				?, ?, 
 				?, ?, 
-				'%s', '%s', '%s', 0,
+				'%s', '%s', '%s', 0, 0,
 				?, ?, 
 				0
 				)`, 
@@ -85,9 +95,21 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 	return err
 }
 
+func RemoveOrder(db *sql.DB, orderId string) error {
+	sqlstr := `delete from DF_PURCHASE_ORDER where ORDER_ID=?`
+
+	_, err := db.Exec(sqlstr, orderId)
+
+	return err
+}
+
 //=============
 
 const DeadlineExtendedDuration_Month = time.Duration(-1)
+
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month, 0, 0, 0, 0, 0, time.UTC).AddDate(0, 1, -1).Day()
+}
 
 func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.Time {
 	switch extended {
@@ -99,11 +121,12 @@ func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.T
 			y++
 			m = time.January
 		}
-		next := time.Date(y, m, 0, 0, 0, 0, 0, time.UTC)
-		if d >= next.Day() {
-			d = next.Day() - 1
+		
+		lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
+		if d > lastDay {
+			d = lastDay
 		}
-		next = time.Date(y, m, d, 
+		next := time.Date(y, m, d, 
 			startTime.Hour(), startTime.Minute(), startTime.Second(), startTime.Nanosecond(), 
 			time.FixedZone(startTime.Zone()))
 
@@ -185,22 +208,27 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		return nil, fmt.Errorf("order (id=%s) not found", orderId)
 	}
 
-	order.Deadline_time = extendTime(order.Deadline_time, extendedDuration, order.Start_time)
-
 	// need checking this? This function should be only called when a payment was just made.
 	//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
 	//	tx.Rollback()
 	//	return fmt.Errorf("order (id=%s) not consumable", orderId)
 	//}
 
+	deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
+	lastConsumeId := order.Last_consume_id + 1
+
+	onOk := func() {
+		order.Deadline_time = deadlineTime
+		order.Last_consume_id = lastConsumeId
+	}
+
 	// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
 
-	order.Deadline_time = order.Deadline_time.Add(extendedDuration)
-	timestr := order.Deadline_time.Format("2006-01-02 15:04:05.999999")
+	timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, RENEW_RETRIES=0, STATUS=%d
+				DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
 				where ORDER_ID=?`, 
-				timestr, order.Last_consume_id+1,
+				timestr, lastConsumeId,
 				OrderStatus_Consuming,
 				)
 
@@ -221,6 +249,8 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 	if err != nil {
 		return nil, err
 	}
+
+	onOk()
 
 	return order, nil
 }
@@ -428,10 +458,19 @@ func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int
 
 func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
+
+	// filter out pending orders
+	if sqlWhere == "" {
+		sqlWhere = "EVER_PAYED=1"
+	} else {
+		sqlWhere = sqlWhere + " and EVER_PAYED=1"
+	}
+
 	sql_where_all := ""
 	if sqlWhere != "" {
 		sql_where_all = fmt.Sprintf("where %s", sqlWhere)
 	}
+
 	offset_str := ""
 	if offset > 0 {
 		offset_str = fmt.Sprintf("offset %d", offset)
@@ -440,7 +479,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 					ORDER_ID, 
 					ACCOUNT_ID, REGION, 
 					PLAN_ID, PLAN_TYPE,
-					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, 
+					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
 					CREATOR, STATUS, 
 					RENEW_RETRIES
 					from DF_PURCHASE_ORDER
@@ -466,7 +505,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 			&order.Order_id, 
 			&order.Account_id, &order.Region, 
 			&order.Plan_id, &order.Plan_type, 
-			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id,
+			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id, &order.Ever_payed,
 			&order.Creator, &order.Status, 
 			&order.Num_renew_retires,
 		)

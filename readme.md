@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    END_TIME           DATETIME COMMENT 'invalid when status is consuming',
    DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
    LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
+   EVER_PAYED         TINYINT DEFAULT 0 COMMENT 'LAST_CONSUME_ID > 0',
    RENEW_RETRIES      TINYINT DEFAULT 0 COMMENT 'num renew fails, most 100',
    STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
    CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
