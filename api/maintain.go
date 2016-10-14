@@ -9,6 +9,10 @@ import (
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
 
+func OrderRenewReason(orderId string, renewTimes int) string {
+	changeReason := fmt.Sprintf("order:%s:%d", orderId, renewTimes)
+}
+
 //======================================================
 // 
 //======================================================
@@ -16,8 +20,21 @@ import (
 func StartMaintaining() {
 	Logger.Infof("Maintaining service started.")
 
+	timerRenewOrders := time.After(time.Minute)
+	for {
+		select {
+		case <-timerRenewOrders:
+			timerRenewOrders = TryToRenewConsumingOrders()
+		}
+	}
+}
+
+func TryToRenewConsumingOrders() <- chan time.Time {
+
 	// todo:
 	// find all consuming orders which deadline < now()+7_days.
+
+	return time.After(time.Hour)
 }
 
 //======================================================
@@ -36,7 +53,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 	if err != nil {
 		err2 := usage.IncreaseOrderRenewalFails(db, orderId)
 		if err2 != nil {
-			Logger.Errorf("IncreaseOrderRenewalFails error: %s", err2.Error())
+			Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
 		}
 
 		return err
@@ -44,9 +61,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 
 	now := time.Now()
 
-	// todo: create a consuming report // need? maybe payment moodule has recoreded it.
-
-	// change order status => consuming // will do in renew
+	// change order status => consuming // will do in following renew calling
 	
 	var extendedDuration time.Duration
 
@@ -61,7 +76,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 	if err != nil {
 		// todo: retry
 
-		Logger.Errorf("RenewOrder error: %s", err.Error())
+		Logger.Warningf("RenewOrder error: %s", err.Error())
 		return err
 	}
 
@@ -69,7 +84,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 	if err != nil {
 		// todo: retry
 
-		Logger.Errorf("CreateConsumeHistory error: %s", err.Error())
+		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
 		return err
 	}
 

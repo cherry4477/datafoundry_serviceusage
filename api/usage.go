@@ -290,13 +290,47 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	planRegion := plan.Region
 
 	// ...
+
+	orderId := genOrderID(accountId, planType)
+
+	// check if there is an old order
+
+	oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
+		return
+	}
+	var oldPlan *Plan
+	if oldOrder != nil {
+		// get old plan and check price
+
+		// todo: need getPlanByAutoID(oldOrder.Plan_history_id)
+		oldPlan, err := getPlanByID(oldOrder.Plan_id)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error() + " (old)"), nil)
+			return
+		}
+
+		if oldPlan.Cycle != plan.Cycle {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "new plan.cycle is different from old plan"), nil)
+			return
+		}
+
+		if oldPlan.Price > plan.Price {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "new plan.price is lower than old plan.price"), nil)
+			return
+		}
+	}
+
+	// create new order (in pending status)
+
 	now := time.Now()
 	startTime := now
 	endTime := now
 	deadlineTime := now
 
 	order := &usage.PurchaseOrder{
-		Order_id: genOrderID(accountId, planType),
+		Order_id: orderId,
 		Account_id: accountId,
 
 		Plan_id : planId,
@@ -312,22 +346,21 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		Creator: creator,
 	}
 
-	err = usage.CreateOrder(db, order)
+	order.Id, err = usage.CreateOrder(db, order)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, err.Error()), nil)
 		return
 	}
 
-	// ...
-	changeReason := fmt.Sprintf("order:%s:%d", order.Order_id, 1)
-	err = renewOrder(accountId, order.Order_id, plan, changeReason)
+	// make the payment
+
+	err = renewOrder(accountId, order, plan, oldOrder, oldPlan)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
-		
-		// todo: remove pending order, needed?
-		
 		return
 	}
+
+	// ...
 
 	JsonResult(w, http.StatusOK, nil, order)
 }
@@ -477,7 +510,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	order, err := usage.RetrieveOrderByID(db, orderId)
+	order, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return

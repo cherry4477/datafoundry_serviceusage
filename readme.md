@@ -67,7 +67,7 @@ msg: 返回信息
 
 ### GET /usageapi/v1/orders/{order_id}?namespace={namespace}
 
-用户查询某个订单
+用户查询某个订单（status=consuming）
 
 Path Parameters:
 ```
@@ -156,12 +156,15 @@ data.results[0].plan_id
 
 ## 数据库设计
 
+订单：
 ```
 CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 (
+   ID                 BIGINT NOT NULL AUTO_INCREMENT,
    ORDER_ID           VARCHAR(64) NOT NULL,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'important to retrieve history plan',
    PLAN_ID            VARCHAR(64) NOT NULL,
    PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
    START_TIME         DATETIME,
@@ -175,21 +178,43 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 ```
+    ID
+    PLAN_HISTORY_ID
 
-对后付费，消费报表:
+消费报表：
 ```
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
+   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.Id',
    ORDER_ID           VARCHAR(64) NOT NULL,
    CONSUME_ID         INT,
    CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
    CONSUME_TIME       DATETIME,
+   DEADLINE_TIME      DATETIME,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
-   PRIMARY KEY (ORDER_ID, CONSUME_ID)
+   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'important to retrieve history plan',
+   PRIMARY KEY (ID, ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
 ```
+    ID
+    DEADLINE_TIME
+    PLAN_HISTORY_ID
+
+
+type Plan struct {
+	Plan_id        string    `json:"plan_id,omitempty"`
+	Plan_name      string    `json:"plan_name,omitempty"`
+	Plan_type      string    `json:"plan_type,omitempty"`
+	Specification1 string    `json:"specification1,omitempty"`
+	Specification2 string    `json:"specification2,omitempty"`
+	Price          float32   `json:"price,omitempty"`
+	Cycle          string    `json:"cycle,omitempty"`
+	Region         string    `json:"region,omitempty"`
+	Create_time    time.Time `json:"creation_time,omitempty"`
+	Status         string    `json:"status,omitempty"`
+}
 
 ## 部署
 
@@ -223,3 +248,7 @@ oc expose service datafoundryserviceusage --hostname=datafoundry-serviceusage.ap
 oc start-build datafoundryserviceusage
 
 ```
+
+## test
+
+> go test -v -cover $(go list ./... | grep -v /vendor/)

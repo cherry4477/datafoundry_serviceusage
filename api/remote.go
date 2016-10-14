@@ -58,8 +58,6 @@ func initGateWay() {
 // 
 //================================================================
 
-// todo: modify the remote calling by using openshift API lib
-
 type ObjectMeta struct {
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 }
@@ -87,7 +85,6 @@ func authDF(token string) (*User, error) {
 		return nil, err
 	}
 
-	// todo: use return code and msg instead
 	if response.StatusCode != http.StatusOK {
 		Logger.Debugf("remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
 		return nil, fmt.Errorf("remote (%s) status code: %d.", url, response.StatusCode)
@@ -103,6 +100,7 @@ func authDF(token string) (*User, error) {
 	return user, nil
 }
 */
+
 func authDF(userToken string) (*User, error) {
 	u := &User{}
 	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
@@ -172,8 +170,6 @@ type Plan struct {
 	Status         string    `json:"status,omitempty"`
 }
 
-// todo: retrieve plan
-
 func getPlanByID(planId string) (*Plan, error) {
 	if Debug {
 		return &Plan{
@@ -219,13 +215,9 @@ func getPlanByID(planId string) (*Plan, error) {
 	return plan, nil
 }
 
-// todo: check if user can manage project (make payment)
-
 //=======================================================================
 // 
 //=======================================================================
-
-// todo: send consume money request
 
 func makePayment(adminToken, accountId string, money float32, reason string) error {
 	if Debug {

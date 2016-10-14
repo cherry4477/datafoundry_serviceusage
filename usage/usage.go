@@ -25,6 +25,7 @@ const (
 )
 
 type PurchaseOrder struct {
+	Id                int64      `json:"_"`
 	Order_id          string     `json:"order_id,omitempty"`
 	Account_id        string     `json:"project,omitempty"` // accountId
 	Region            string     `json:"region,omitempty"`
@@ -46,7 +47,9 @@ type PurchaseOrder struct {
 //
 //=============================================================
 
-func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
+// return the auto generated id
+func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
+	/*
 	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
 	if err != nil {
 		return err
@@ -65,6 +68,8 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 			return fmt.Errorf("order (id=%s) already existed", orderInfo.Order_id)
 		}
 	}
+	*/
+	// zongsan: now pending orders will be kept in db.
 
 	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
@@ -86,14 +91,17 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) error {
 				)`, 
 				startTime, endTime, consumeTime,
 				)
-	_, err = db.Exec(sqlstr,
+	result, err := db.Exec(sqlstr,
 				orderInfo.Order_id, 
 				orderInfo.Account_id, orderInfo.Region,  
 				orderInfo.Plan_id, orderInfo.Plan_type, 
 				orderInfo.Creator, orderInfo.Status,  
 				)
+	if err != nil {
+		return 0, err
+	}
 
-	return err
+	return result.LastInsertId()
 }
 
 func RemoveOrder(db *sql.DB, orderId string) error {
@@ -109,7 +117,7 @@ func RemoveOrder(db *sql.DB, orderId string) error {
 const DeadlineExtendedDuration_Month = time.Duration(-1)
 
 func daysInMonth(year int, month time.Month) int {
-	return time.Date(year, month, 0, 0, 0, 0, 0, time.UTC).AddDate(0, 1, -1).Day()
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.Time {
@@ -123,7 +131,7 @@ func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.T
 			m = time.January
 		}
 		
-		lastDay := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC).Day()
+		lastDay := daysInMonth(y, m)
 		if d > lastDay {
 			d = lastDay
 		}
@@ -149,14 +157,14 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 		return err
 	}
 
-	order, err := RetrieveOrderByID(tx, orderId)
+	order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 	if order == nil {
 		tx.Rollback()
-		return fmt.Errorf("order (id=%s) not found", orderId)
+		return fmt.Errorf("consuming order (id=%s) not found", orderId)
 	}
 
 	if order.Num_renew_retires >= MaxNumRenewalRetries {
@@ -199,14 +207,14 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		return nil, err
 	}
 
-	order, err := RetrieveOrderByID(tx, orderId)
+	order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
 	if err != nil {
 		tx.Rollback()
 		return nil, err
 	}
 	if order == nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("order (id=%s) not found", orderId)
+		return nil, fmt.Errorf("consuming order (id=%s) not found", orderId)
 	}
 
 	// need checking this? This function should be only called when a payment was just made.
@@ -257,12 +265,12 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 }
 
 func EndOrder(db *sql.DB, orderId string, accountId string) error {
-	order, err := RetrieveOrderByID(db, orderId)
+	order, err := RetrieveOrderByID(db, orderId, OrderStatus_Consuming)
 	if err != nil {
 		return err
 	}
 	if order != nil {
-		return fmt.Errorf("order (id=%s) already existed", orderId)
+		return fmt.Errorf("consumign order (id=%s) already existed", orderId)
 	}
 	if order.Account_id != accountId {
 		return fmt.Errorf("account id of order (id=%s) and input account id (%s) not match", orderId, accountId)
@@ -293,26 +301,15 @@ func EndOrder(db *sql.DB, orderId string, accountId string) error {
 	return nil
 }
 
-func RetrieveOrderByID(db DbOrTx, orderId string) (*PurchaseOrder, error) {
-	// todo: use ? instead
-	return getSingleOrder(db, fmt.Sprintf("ORDER_ID='%s'", orderId))
-}
+// status argument must be a valid order status value
+func RetrieveOrderByID(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
+	sqlWhere := "ORDER_ID=? and STATUS=?"
 
-func getSingleOrder(db DbOrTx, sqlWhere string) (*PurchaseOrder, error) {
-	orders, err := queryOrders(db, sqlWhere, 1, 0)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		} else {
-			return nil, err
-		}
-	}
+	sqlParams := make([]interface{},2)
+	sqlParams[0] = orderId
+	sqlParams[1] = status
 
-	if len(orders) == 0 {
-		return nil, nil
-	}
-
-	return orders[0], nil
+	return getSingleOrder(db, sqlWhere, sqlParams)
 }
 
 func QueryOrders(db DbOrTx, accountId string, region string, status int, renewalFailedOnly bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
@@ -466,6 +463,23 @@ func queryOrdersCount(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (int
 	return count, err
 }
 
+func getSingleOrder(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (*PurchaseOrder, error) {
+	orders, err := queryOrders(db, sqlWhere, 1, 0, sqlParams...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	if len(orders) == 0 {
+		return nil, nil
+	}
+
+	return orders[0], nil
+}
+
 func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*PurchaseOrder, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
 
@@ -479,6 +493,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 		offset_str = fmt.Sprintf("offset %d", offset)
 	}
 	sql_str := fmt.Sprintf(`select
+					ID,
 					ORDER_ID, 
 					ACCOUNT_ID, REGION, 
 					PLAN_ID, PLAN_TYPE,
@@ -507,6 +522,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 	for rows.Next() {
 		order := &PurchaseOrder{}
 		err := rows.Scan(
+			&order.Id, 
 			&order.Order_id, 
 			&order.Account_id, &order.Region, 
 			&order.Plan_id, &order.Plan_type, 
@@ -539,6 +555,7 @@ func MoneyToConsuming(money float32) int64 {
 }
 
 type ConsumeHistory struct {
+	Id                int64     `json:"_"`
 	Order_id          string    `json:"order_id,omitempty"`
 	Consume_id        int       `json:"_,omitempty"`
 	Consume_time      time.Time `json:"time,omitempty"`
@@ -553,7 +570,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
-				ORDER_ID, CONSUME_ID,
+				ID, ORDER_ID, CONSUME_ID,
 				CONSUMING, CONSUME_TIME,
 				ACCOUNT_ID, REGION, PLAN_ID
 				) values (
@@ -561,7 +578,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 				%d, '%s', 
 				'%s', '%s', '%s'
 				)`, 
-				orderInfo.Order_id, orderInfo.Last_consume_id,
+				orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id,
 				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, 
 				)
@@ -646,7 +663,7 @@ func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlPa
 		offset_str = fmt.Sprintf("offset %d", offset)
 	}
 	sql_str := fmt.Sprintf(`select
-					ORDER_ID, CONSUME_ID,
+					ID, ORDER_ID, CONSUME_ID,
 					CONSUMING, CONSUME_TIME,
 					ACCOUNT_ID, REGION, PLAN_ID
 					from DF_CONSUMING_HISTORY
@@ -668,7 +685,7 @@ func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlPa
 	for rows.Next() {
 		consume := &ConsumeHistory{}
 		err := rows.Scan(
-			&consume.Order_id, &consume.Consume_id, 
+			&consume.Id, &consume.Order_id, &consume.Consume_id, 
 			&consume.Consuming, &consume.Consume_time, 
 			&consume.Account_id, &consume.Region, &consume.Plan_id, 
 		)
