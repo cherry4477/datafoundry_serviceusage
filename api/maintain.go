@@ -9,10 +9,6 @@ import (
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
 
-func OrderRenewReason(orderId string, renewTimes int) string {
-	changeReason := fmt.Sprintf("order:%s:%d", orderId, renewTimes)
-}
-
 //======================================================
 // 
 //======================================================
@@ -39,9 +35,19 @@ func TryToRenewConsumingOrders() <- chan time.Time {
 
 //======================================================
 // 
-//======================================================
+//======================================================	
 
-func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
+func OrderRenewReason(orderId string, renewTimes int) string {
+	return fmt.Sprintf("order:%s:%d", orderId, renewTimes) // DON'T change
+}
+
+func renewOrder(accountId string, order *usage.PurchaseOrder, plan *Plan, lastConsume *usage.ConsumeHistory) error {
+	renewReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
+	
+	return nil
+}
+
+func renewOrder_old(accountId, orderId string, plan *Plan, renewReason string) error {
 	db := getDB()
 	if db == nil {
 		return fmt.Errorf("db not inited")
@@ -49,7 +55,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 
 	// ...
 
-	err := makePayment(openshift.AdminToken(), accountId, plan.Price, reason)
+	err := makePayment(openshift.AdminToken(), accountId, plan.Price, renewReason)
 	if err != nil {
 		err2 := usage.IncreaseOrderRenewalFails(db, orderId)
 		if err2 != nil {
@@ -80,7 +86,7 @@ func renewOrder(accountId, orderId string, plan *Plan, reason string) error {
 		return err
 	}
 
-	err = usage.CreateConsumeHistory(db, order, now, plan.Price)
+	err = usage.CreateConsumeHistory(db, order, now, plan.Price, plan.Id)
 	if err != nil {
 		// todo: retry
 

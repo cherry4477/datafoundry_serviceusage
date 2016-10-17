@@ -156,49 +156,53 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 	if err != nil {
 		return err
 	}
-
-	order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	if order == nil {
-		tx.Rollback()
-		return fmt.Errorf("consuming order (id=%s) not found", orderId)
-	}
-
-	if order.Num_renew_retires >= MaxNumRenewalRetries {
-		tx.Rollback()
-		return nil
-	}
-
-	order.Num_renew_retires ++
-
-	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				RENEW_RETRIES=%d
-				where ORDER_ID=?`, 
-				order.Num_renew_retires,
-				)
-
-	result, err := tx.Exec(sqlstr,
-				orderId,
-				)
-	_ = result
-	if err != nil {
-		return err
-	}
-
-	//n, _ := result.RowsAffected()
-	//if n < 1 {
-	//	return fmt.Errorf("order (%s) not found", orderId)
-	//}
-
-	err = tx.Commit()
-	if err != nil {
-		return err
-	}
 	
-	return nil
+	return func() error {
+		type db chan struct{} // avoid misuing db
+
+		order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if order == nil {
+			tx.Rollback()
+			return fmt.Errorf("consuming order (id=%s) not found", orderId)
+		}
+
+		if order.Num_renew_retires >= MaxNumRenewalRetries {
+			tx.Rollback()
+			return nil
+		}
+
+		order.Num_renew_retires ++
+
+		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+					RENEW_RETRIES=%d
+					where ORDER_ID=?`, 
+					order.Num_renew_retires,
+					)
+
+		result, err := tx.Exec(sqlstr,
+					orderId,
+					)
+		_ = result
+		if err != nil {
+			return err
+		}
+
+		//n, _ := result.RowsAffected()
+		//if n < 1 {
+		//	return fmt.Errorf("order (%s) not found", orderId)
+		//}
+
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+		
+		return nil
+	}()
 }
 
 func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
@@ -207,61 +211,65 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		return nil, err
 	}
 
-	order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
-	if err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-	if order == nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("consuming order (id=%s) not found", orderId)
-	}
+	return func() (*PurchaseOrder, error) {
+		type db chan struct{} // avoid misuing db
 
-	// need checking this? This function should be only called when a payment was just made.
-	//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
-	//	tx.Rollback()
-	//	return fmt.Errorf("order (id=%s) not consumable", orderId)
-	//}
+		order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if order == nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("consuming order (id=%s) not found", orderId)
+		}
 
-	deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
-	lastConsumeId := order.Last_consume_id + 1
+		// need checking this? This function should be only called when a payment was just made.
+		//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
+		//	tx.Rollback()
+		//	return fmt.Errorf("order (id=%s) not consumable", orderId)
+		//}
 
-	onOk := func() {
-		order.Deadline_time = deadlineTime
-		order.Last_consume_id = lastConsumeId
-	}
+		deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
+		lastConsumeId := order.Last_consume_id + 1
 
-	// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
+		onOk := func() {
+			order.Deadline_time = deadlineTime
+			order.Last_consume_id = lastConsumeId
+		}
 
-	timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
-	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
-				where ORDER_ID=?`, 
-				timestr, lastConsumeId,
-				OrderStatus_Consuming,
-				)
+		// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
 
-	result, err := tx.Exec(sqlstr,
-				orderId,
-				)
-	_ = result
-	if err != nil {
-		return nil, err
-	}
+		timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
+		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+					DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
+					where ORDER_ID=?`, 
+					timestr, lastConsumeId,
+					OrderStatus_Consuming,
+					)
 
-	//n, _ := result.RowsAffected()
-	//if n < 1 {
-	//	return nil, fmt.Errorf("order (%s) not found", orderId)
-	//}
+		result, err := tx.Exec(sqlstr,
+					orderId,
+					)
+		_ = result
+		if err != nil {
+			return nil, err
+		}
 
-	err = tx.Commit()
-	if err != nil {
-		return nil, err
-	}
+		//n, _ := result.RowsAffected()
+		//if n < 1 {
+		//	return nil, fmt.Errorf("order (%s) not found", orderId)
+		//}
 
-	onOk()
+		err = tx.Commit()
+		if err != nil {
+			return nil, err
+		}
 
-	return order, nil
+		onOk()
+
+		return order, nil
+	}()
 }
 
 func EndOrder(db *sql.DB, orderId string, accountId string) error {
@@ -558,33 +566,46 @@ type ConsumeHistory struct {
 	Id                int64     `json:"_"`
 	Order_id          string    `json:"order_id,omitempty"`
 	Consume_id        int       `json:"_,omitempty"`
-	Consume_time      time.Time `json:"time,omitempty"`
 	Consuming         int64     `json:"_,omitempty"`       // po
 	Money             float32   `json:"money,omitempty"`   // vo, Money = Consuming * 0.0001
+	Consume_time      time.Time `json:"time,omitempty"`
+	Deadline_time     time.Time `json:"deadline,omitempty"`
 	Account_id        string    `json:"project,omitempty"` // accountId
 	Region            string    `json:"region,omitempty"`
 	Plan_id           string    `json:"plan_id,omitempty"`
+	Plan_history_id   string    `json:"plan_history_id,omitempty"`
 }
 
-func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32) error {
+func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64) error {
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
 				ID, ORDER_ID, CONSUME_ID,
-				CONSUMING, CONSUME_TIME,
+				CONSUMING, CONSUME_TIME, DEADLINE_TIME,
 				ACCOUNT_ID, REGION, PLAN_ID
 				) values (
-				'%s', %d, 
-				%d, '%s', 
-				'%s', '%s', '%s'
+				%d, '%s', %d, 
+				%d, '%s', '%s', 
+				'%s', '%s', '%s', %d
 				)`, 
 				orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id,
-				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), 
-				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, 
+				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.Format("2006-01-02 15:04:05.999999"), 
+				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, planHistoryId,
 				)
 	_, err := db.Exec(sqlstr)
 
 	return err
+}
+
+// status argument must be a valid order status value
+func RetrieveConsumeHistory(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
+	sqlWhere := "ORDER_ID=? and STATUS=?"
+
+	sqlParams := make([]interface{},2)
+	sqlParams[0] = orderId
+	sqlParams[1] = status
+
+	return getSingleConsuming(db, sqlWhere, sqlParams)
 }
 
 func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region string, offset int64, limit int) (int64, []*ConsumeHistory, error) {
@@ -652,6 +673,23 @@ func queryConsumingsCount(db *sql.DB, sqlWhere string, sqlParams ...interface{})
 	return count, err
 }
 
+func getSingleConsuming(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (*ConsumeHistory, error) {
+	consumings, err := queryConsumings(db, sqlWhere, 1, 0, sqlParams...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	if len(consumings) == 0 {
+		return nil, nil
+	}
+
+	return consumings[0], nil
+}
+
 func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
 	sql_where_all := ""
@@ -664,8 +702,8 @@ func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlPa
 	}
 	sql_str := fmt.Sprintf(`select
 					ID, ORDER_ID, CONSUME_ID,
-					CONSUMING, CONSUME_TIME,
-					ACCOUNT_ID, REGION, PLAN_ID
+					CONSUMING, CONSUME_TIME, DEADLINE_TIME,
+					ACCOUNT_ID, REGION, PLAN_ID, PLAN_HISTORY_ID
 					from DF_CONSUMING_HISTORY
 					%s
 					limit %d
@@ -686,8 +724,8 @@ func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlPa
 		consume := &ConsumeHistory{}
 		err := rows.Scan(
 			&consume.Id, &consume.Order_id, &consume.Consume_id, 
-			&consume.Consuming, &consume.Consume_time, 
-			&consume.Account_id, &consume.Region, &consume.Plan_id, 
+			&consume.Consuming, &consume.Consume_time, &consume.Deadline_time, 
+			&consume.Account_id, &consume.Region, &consume.Plan_id, &consume.Plan_history_id, 
 		)
 		if err != nil {
 			return nil, err

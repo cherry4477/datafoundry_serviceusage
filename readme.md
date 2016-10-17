@@ -56,7 +56,7 @@ order_id: 订单号。
 Body Parameters (json):
 ```
 action: 目前只支持cancel
-namespace: 不可省略，作校验用
+namespace: 可省略，默认为当前用户名称
 ```
 
 Return Result (json):
@@ -76,7 +76,7 @@ order_id: 订单号。
 
 Query Parameters:
 ```
-namespace: 不可省略，作校验用。
+namespace: 可省略，默认为当前用户名称。
 ```
 
 Return Result (json):
@@ -100,7 +100,7 @@ data.creator
 
 Query Parameters:
 ```
-namespace: 不可省略，作校验用。
+namespace: 可省略，默认为当前用户名称。
 status: 订单状态。"consuming" | "ending" | "ended" | "renewalfailed"。可以缺省，表示consuming。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
@@ -132,7 +132,7 @@ data.results[0].creator
 
 Query Parameters:
 ```
-namespace: 不可省略，作校验用。
+namespace: 可省略，默认为当前用户名称。
 order: 订单号。可省略，表示namespace内的所有订单。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
@@ -164,7 +164,6 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    ORDER_ID           VARCHAR(64) NOT NULL,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
-   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'important to retrieve history plan',
    PLAN_ID            VARCHAR(64) NOT NULL,
    PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
    START_TIME         DATETIME,
@@ -178,43 +177,24 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    PRIMARY KEY (ORDER_ID)
 )  DEFAULT CHARSET=UTF8;
 ```
-    ID
-    PLAN_HISTORY_ID
 
 消费报表：
 ```
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
-   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.Id',
+   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.ID',
    ORDER_ID           VARCHAR(64) NOT NULL,
-   CONSUME_ID         INT,
+   CONSUME_ID         INT COMMENT,
    CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
    CONSUME_TIME       DATETIME,
    DEADLINE_TIME      DATETIME,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
-   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'important to retrieve history plan',
+   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'auto gen id, important to retrieve history plan',
    PRIMARY KEY (ID, ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
 ```
-    ID
-    DEADLINE_TIME
-    PLAN_HISTORY_ID
-
-
-type Plan struct {
-	Plan_id        string    `json:"plan_id,omitempty"`
-	Plan_name      string    `json:"plan_name,omitempty"`
-	Plan_type      string    `json:"plan_type,omitempty"`
-	Specification1 string    `json:"specification1,omitempty"`
-	Specification2 string    `json:"specification2,omitempty"`
-	Price          float32   `json:"price,omitempty"`
-	Cycle          string    `json:"cycle,omitempty"`
-	Region         string    `json:"region,omitempty"`
-	Create_time    time.Time `json:"creation_time,omitempty"`
-	Status         string    `json:"status,omitempty"`
-}
 
 ## 部署
 

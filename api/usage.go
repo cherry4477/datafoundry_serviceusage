@@ -202,12 +202,6 @@ type OrderCreation struct {
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	//JsonResult(w, http.StatusOK, nil, "98DED98A-F7A1-EDF2-3DF7-B799333D2FD3")
-	//
-	//return
-	//
-	// the real implementation
-
 	// ...
 
 	db := getDB()
@@ -305,7 +299,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		// get old plan and check price
 
 		// todo: need getPlanByAutoID(oldOrder.Plan_history_id)
-		oldPlan, err := getPlanByID(oldOrder.Plan_id)
+		oldPlan, err := getPlanByAutoID(oldOrder.Plan_history_id)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error() + " (old)"), nil)
 			return
@@ -371,12 +365,6 @@ type OrderModification struct {
 }
 
 func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-	//JsonResult(w, http.StatusOK, nil, nil)
-	//
-	//return
-	//
-	// the real implementation
 
 	// ...
 
@@ -457,22 +445,6 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-	//order := &usage.PurchaseOrder {
-	//	Order_id: params.ByName("id"),
-	//	Account_id: r.FormValue("project"),
-	//	Region: "JD",
-	//	Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
-	//	Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-	//	EndTime: nil,
-	//	Status: usage.OrderStatus_Consuming,
-	//}
-	//
-	//JsonResult(w, http.StatusOK, nil, order)
-	//
-	//return
-	//
-	// the real implementation
-
 	// ...
 
 	db := getDB()
@@ -520,70 +492,6 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	/*
-	orders := []*usage.PurchaseOrder {
-		{
-			Order_id: "1111D98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Account_id: r.FormValue("project"),
-			Region: "AWS",
-			Plan_id: "49D67204-F690-6B46-FCE9-1AEFFBDD6166",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "2222D98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Account_id: r.FormValue("project"),
-			Region: "AWS",
-			Plan_id: "2ECE9135-300A-9BB9-8163-5BC7D3F2748D",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "3333D15C-73EF-3541-4BE7-0F6C1863249E",
-			Account_id: r.FormValue("project"),
-			Region: "AWS",
-			Plan_id: "4810D15C-73EF-3541-4BE7-0F6C1863249E",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "55557AB9-B59A-3A3C-4E0C-6463A2941231",
-			Account_id: r.FormValue("project"),
-			Region: "JD",
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-A799333D2FD3",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "6666D98A-F7A1-EDF2-3DF7-B799333D1232",
-			Account_id: r.FormValue("project"),
-			Region: "JD",
-			Plan_id: "672CEA95-781C-BF26-400D-A7BDF8E587FD",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-		{
-			Order_id: "7777D98A-F7A1-EDF2-3DF7-B799333D1233",
-			Account_id: r.FormValue("project"),
-			Region: "JD",
-			Plan_id: "29BA4085-B3B4-8308-2097-7A5340E770B9",
-			Start_time: time.Date(2016, time.May, 10, 23, 0, 0, 0, time.UTC),
-			EndTime: nil,
-			Status: usage.OrderStatus_Consuming,
-		},
-	}
-
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, orders))
-	
-	return
-	*/
-	// the real implementation
-
 	// ...
 
 	db := getDB()
@@ -690,32 +598,6 @@ func groupReports(reports []*usage.ConsumingReport, timeStep int) []*GroupedRepo
 */
 
 func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	/*
-	consumings := []*usage.ConsumeHistory {
-		{
-			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Region: "bj",
-			Consume_time: time.Date(2016, time.May, 10, 24, 0, 0, 0, time.UTC),
-			Money: 1.23,
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
-		},
-		{
-			Order_id: "98DED98A-F7A1-EDF2-3DF7-B799333D2FD5",
-			Account_id: "88DED98A-F7A1-EDF2-3DF7-B799333D2FD3",
-			Region: "bj",
-			Consume_time: time.Date(2016, time.May, 10, 25, 0, 0, 0, time.UTC),
-			Money: 1.23,
-			Plan_id: "89DED98A-F7A1-EDF2-3DF7-9799333D2FD3",
-		},
-	}
-
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(1000, consumings))
-
-	return
-	*/
-	// the real implementation
-
 	// ...
 
 	db := getDB()
