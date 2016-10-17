@@ -294,24 +294,18 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
 	}
-	var oldPlan *Plan
+	var oldOrderConsume *usage.ConsumeHistory
 	if oldOrder != nil {
-		// get old plan and check price
+		// get last payment, so we can check how much money is remaining.
 
-		// todo: need getPlanByAutoID(oldOrder.Plan_history_id)
-		oldPlan, err := getPlanByAutoID(oldOrder.Plan_history_id)
+		oldOrderConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error() + " (old)"), nil)
 			return
 		}
 
-		if oldPlan.Cycle != plan.Cycle {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "new plan.cycle is different from old plan"), nil)
-			return
-		}
-
-		if oldPlan.Price > plan.Price {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "new plan.price is lower than old plan.price"), nil)
+		if oldOrderConsume == nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "last payment not found"), nil)
 			return
 		}
 	}
@@ -348,7 +342,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	err = renewOrder(accountId, order, plan, oldOrder, oldPlan)
+	err = renewOrder(accountId, order, plan, oldOrderConsume)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
 		return
@@ -492,6 +486,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
 	// ...
 
 	db := getDB()

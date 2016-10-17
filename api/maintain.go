@@ -42,8 +42,40 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 }
 
 func renewOrder(accountId string, order *usage.PurchaseOrder, plan *Plan, lastConsume *usage.ConsumeHistory) error {
+	db := getDB()
+	if db == nil {
+		return fmt.Errorf("db not inited")
+	}
+
+	// calculate the payment money
+
+	var moeny float32 = 0.0
+
+	if lastConsume == nil {
+		moeny = plan.Price
+	} else {
+
+	}
+
+	// ...
+
 	renewReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
-	
+
+	err := makePayment(openshift.AdminToken(), accountId, moeny, renewReason)
+	if err != nil {
+		err2 := usage.IncreaseOrderRenewalFails(db, order.Order_id)
+		if err2 != nil {
+			Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
+		}
+
+		return err
+	}
+
+	//now := time.Now()
+
+	// ...
+
+
 	return nil
 }
 

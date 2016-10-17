@@ -597,13 +597,10 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 	return err
 }
 
-// status argument must be a valid order status value
-func RetrieveConsumeHistory(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
-	sqlWhere := "ORDER_ID=? and STATUS=?"
+func RetrieveConsumeHistory(db DbOrTx, orderAutoId int64, orderId string, cunsumeId int) (*ConsumeHistory, error) {
+	sqlWhere := fmt.Sprintf("ID=%d and ORDER_ID=? and CONSUME_ID=%d", orderAutoId, cunsumeId)
 
-	sqlParams := make([]interface{},2)
-	sqlParams[0] = orderId
-	sqlParams[1] = status
+	sqlParams := []interface{}{orderId}
 
 	return getSingleConsuming(db, sqlWhere, sqlParams)
 }
@@ -690,7 +687,7 @@ func getSingleConsuming(db DbOrTx, sqlWhere string, sqlParams ...interface{}) (*
 	return consumings[0], nil
 }
 
-func queryConsumings(db *sql.DB, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
+func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams ...interface{}) ([]*ConsumeHistory, error) {
 	sqlWhere = strings.TrimSpace(sqlWhere)
 	sql_where_all := ""
 	if sqlWhere != "" {

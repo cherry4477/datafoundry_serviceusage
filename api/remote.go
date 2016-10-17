@@ -158,7 +158,7 @@ const PLanType_Quota = "c"
 const PLanCircle_Month = "m"
 
 type Plan struct {
-	Id              int       `json:"id,omitempty"`
+	Id              int64     `json:"id,omitempty"`
 	Plan_id         string    `json:"plan_id,omitempty"`
 	Plan_name       string    `json:"plan_name,omitempty"`
 	Plan_type       string    `json:"plan_type,omitempty"`
