@@ -160,16 +160,19 @@ const PLanType_Quota = "c"
 const PLanCircle_Month = "m"
 
 type Plan struct {
-	Plan_id        string    `json:"plan_id,omitempty"`
-	Plan_name      string    `json:"plan_name,omitempty"`
-	Plan_type      string    `json:"plan_type,omitempty"`
-	Specification1 string    `json:"specification1,omitempty"`
-	Specification2 string    `json:"specification2,omitempty"`
-	Price          float32   `json:"price,omitempty"`
-	Cycle          string    `json:"cycle,omitempty"`
-	Region         string    `json:"region,omitempty"`
-	Create_time    time.Time `json:"creation_time,omitempty"`
-	Status         string    `json:"status,omitempty"`
+	id              int
+	Plan_id         string    `json:"plan_id,omitempty"`
+	Plan_name       string    `json:"plan_name,omitempty"`
+	Plan_type       string    `json:"plan_type,omitempty"`
+	Plan_level      int       `json:"plan_level,omitempty"`
+	Specification1  string    `json:"specification1,omitempty"`
+	Specification2  string    `json:"specification2,omitempty"`
+	Price           float32   `json:"price,omitempty"`
+	Cycle           string    `json:"cycle,omitempty"`
+	Region          string    `json:"region,omitempty"`
+	Region_describe string    `json:"region_describe,omitempty"`
+	Create_time     time.Time `json:"creation_time,omitempty"`
+	Status          string    `json:"status,omitempty"`
 }
 
 // todo: retrieve plan
