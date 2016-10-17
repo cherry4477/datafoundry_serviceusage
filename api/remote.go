@@ -26,10 +26,16 @@ var (
 	RechargeSercice string
 )
 
-func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string) string {
+func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string, portEnv string) string {
 	addr := os.Getenv(addrEnv)
 	if addr == "" {
 		Logger.Fatalf("%s env should not be null", addrEnv)
+	}
+	if portEnv != "" {
+		port := os.Getenv(portEnv)
+		if port != "" {
+			addr += ":" + port
+		}
 	}
 
 	prefix := ""
@@ -46,12 +52,12 @@ func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string) str
 
 
 func initGateWay() {
-	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR")
+	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR", "")
 	openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
 
-	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, "PAYMENT_SERVICE_API_SERVER")
-	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "PLAN_SERVICE_API_SERVER")
-	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "RECHARGE_SERVICE_API_SERVER")
+	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, "DATAFOUNDRYPAYMENT_SERVICE_HOST", "DATAFOUNDRYPAYMENT_SERVICE_PORT")
+	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "DATAFOUNDRYPLAN_SERVICE_HOST", "DATAFOUNDRYPLAN_SERVICE_PORT")
+	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "DATAFOUNDRYRECHARGE_SERVICE_HOST", "DATAFOUNDRYRECHARGE_SERVICE_PORT")
 }
 
 //================================================================
