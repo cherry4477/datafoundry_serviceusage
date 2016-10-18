@@ -20,7 +20,7 @@ import (
 const (
 	OrderStatus_Pending   = 0 // DON'T change!
 	OrderStatus_Consuming = 5 // DON'T change!
-	OrderStatus_Ending    = 10 // DON'T change!
+	//OrderStatus_Ending    = 10 // DON'T change!
 	OrderStatus_Ended     = 15 // DON'T change!
 )
 
@@ -233,7 +233,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
 		lastConsumeId := order.Last_consume_id + 1
 
-		onOk := func() {
+		onOk := func() { // why this? may be history reason
 			order.Deadline_time = deadlineTime
 			order.Last_consume_id = lastConsumeId
 		}
@@ -253,6 +253,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 					)
 		_ = result
 		if err != nil {
+			tx.Rollback()
 			return nil, err
 		}
 
@@ -272,41 +273,56 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 	}()
 }
 
-func EndOrder(db *sql.DB, orderId string, accountId string) error {
-	order, err := RetrieveOrderByID(db, orderId, OrderStatus_Consuming)
-	if err != nil {
-		return err
-	}
-	if order != nil {
-		return fmt.Errorf("consumign order (id=%s) already existed", orderId)
-	}
-	if order.Account_id != accountId {
-		return fmt.Errorf("account id of order (id=%s) and input account id (%s) not match", orderId, accountId)
-	}
-	if order.Status == OrderStatus_Ending || order.Status == OrderStatus_Ended {
-		return fmt.Errorf("order (id=%s) already ended", orderId)
-	}
-
-	sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
-				STATUS=%d
-				where 
-				ORDER_ID=?`, 
-				OrderStatus_Ended,
-				)
-	result, err := db.Exec(sqlstr,
-				orderId,
-				)
-	_ = result
+func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsume *ConsumeHistory, remainingMoney float32) error {
+	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 
-	//n, _ := result.RowsAffected()
-	//if n < 1 {
-	//	return fmt.Errorf("order (%s) not found", orderId)
-	//}
+	return func() error {
+		type db chan struct{} // avoid misuing db
 
-	return nil
+		endTimtStr := endTime.Format("2006-01-02 15:04:05.999999")
+
+		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+					STATUS=%d, END_TIME='%s'
+					where 
+					STATUS=%d and ID=%d and ORDER_ID=? and ACCOUNT_ID=?`, 
+					OrderStatus_Ended, endTimtStr,
+					OrderStatus_Consuming, orderInfo.Id, 
+					)
+		result, err := tx.Exec(sqlstr,
+					orderInfo.Order_id, orderInfo.Account_id,
+					)
+		_ = result
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		n, err := result.RowsAffected()
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		removed := n > 0
+		if removed {
+			err := CreateConsumeHistory(tx, orderInfo, endTime, -remainingMoney, 
+							lastConsume.Plan_history_id, ConsumeExtraInfo_EndOrder)
+			if err != nil {
+				tx.Rollback()
+				return err
+			}
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}()
 }
 
 // status argument must be a valid order status value
@@ -581,11 +597,11 @@ type ConsumeHistory struct {
 	Account_id        string    `json:"project,omitempty"` // accountId
 	Region            string    `json:"region,omitempty"`
 	Plan_id           string    `json:"plan_id,omitempty"`
-	Plan_history_id   string    `json:"plan_history_id,omitempty"`
+	Plan_history_id   int64     `json:"plan_history_id,omitempty"`
 	Extra_info        int       `json:"_"`
 }
 
-func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64, extraInfo int) error {
+func CreateConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64, extraInfo int) error {
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (

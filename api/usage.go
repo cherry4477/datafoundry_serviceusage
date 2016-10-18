@@ -131,7 +131,7 @@ func validateRegion(region string) (string, *Error) {
 const (
 	OrderStatusLabel_Pending   = "pending"
 	OrderStatusLabel_Consuming = "consuming"
-	OrderStatusLabel_Ending    = "ending"
+	//OrderStatusLabel_Ending    = "ending"
 	OrderStatusLabel_Ended     = "ended"
 
 	OrderStatusLabel_RenewalFailed = "renewfailed" // fake label
@@ -147,8 +147,8 @@ func validateOrderStatus(statusName string) (int, *Error) {
 		status = usage.OrderStatus_Pending
 	case OrderStatusLabel_Consuming, OrderStatusLabel_RenewalFailed:
 		status = usage.OrderStatus_Consuming
-	case OrderStatusLabel_Ending:
-		status = usage.OrderStatus_Ending
+	//case OrderStatusLabel_Ending:
+	//	status = usage.OrderStatus_Ending
 	case OrderStatusLabel_Ended:
 		status = usage.OrderStatus_Ended
 	}
@@ -162,8 +162,8 @@ func orderStatusToLabel(status int) string {
 		return OrderStatusLabel_Pending
 	case usage.OrderStatus_Consuming:
 		return OrderStatusLabel_Consuming
-	case usage.OrderStatus_Ending:
-		return OrderStatusLabel_Ending
+	//case usage.OrderStatus_Ending:
+	//	return OrderStatusLabel_Ending
 	case usage.OrderStatus_Ended:
 		return OrderStatusLabel_Ended
 	}
@@ -294,20 +294,9 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
 	}
-	var oldOrderConsume *usage.ConsumeHistory
-	if oldOrder != nil {
-		// get last payment, so we can check how much money is remaining.
-
-		oldOrderConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
-		if err != nil {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error() + " (old)"), nil)
-			return
-		}
-
-		if oldOrderConsume == nil {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeInvalidParameters, "last payment not found"), nil)
-			return
-		}
+	if oldOrder != nil && oldOrder.Plan_id == planId {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Plan not changed"), nil)
+		return
 	}
 
 	// create new order (in pending status)
@@ -342,7 +331,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	err = renewOrder(accountId, order, plan, oldOrderConsume)
+	err = renewOrder(db, accountId, order, plan, oldOrder)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
 		return
@@ -416,6 +405,12 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
+	oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
+		return
+	}
+
 	switch orderMod.Action {
 	default: 
 
@@ -424,9 +419,15 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	case "cancel":
 
-		// todo: different plan types may need different handlings
+		oldOrderConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error() + " (old)"), nil)
+			return
+		}
 
-		err = usage.EndOrder(db, orderId, accountId)
+		// todo: different plan types may need different handlings
+		// todo: now, withdraw is not supported
+		err = usage.EndOrder(db, oldOrder, oldOrderConsume, 0.0)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
 			return

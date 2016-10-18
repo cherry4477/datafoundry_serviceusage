@@ -101,7 +101,7 @@ data.creator
 Query Parameters:
 ```
 namespace: 可省略，默认为当前用户名称。
-status: 订单状态。"consuming" | "ending" | "ended" | "renewalfailed"。可以缺省，表示consuming。
+status: 订单状态。"consuming" | "ended" | "renewalfailed"。可以缺省，表示consuming。
 region: 区标识。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
