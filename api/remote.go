@@ -57,7 +57,7 @@ func initGateWay() {
 
 	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, "DATAFOUNDRYPAYMENT_SERVICE_HOST", "DATAFOUNDRYPAYMENT_SERVICE_PORT")
 	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "DATAFOUNDRYPLAN_SERVICE_HOST", "DATAFOUNDRYPLAN_SERVICE_PORT")
-	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "DATAFOUNDRYRECHARGE_SERVICE_HOST", "DATAFOUNDRYRECHARGE_SERVICE_PORT")
+	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "DATAFOUNDRYRECHARGE_SERVICE_HOST", "DATAFOUNDRYRECHARGE_SERVICE_PORT_8090_TCP")
 }
 
 //================================================================
