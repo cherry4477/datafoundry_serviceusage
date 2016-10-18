@@ -49,12 +49,30 @@ func renewOrder(accountId string, order *usage.PurchaseOrder, plan *Plan, lastCo
 
 	// calculate the payment money
 
-	var moeny float32 = 0.0
+	var consumExtraInfo int
+	var moeny float32
 
 	if lastConsume == nil {
-		moeny = plan.Price
+		money = plan.Price
+		consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
 	} else {
+		now := time.Now()
+		if lastConsume.Deadline_time.Sub(now) < 0 {
+			// try end last order 
 
+			// create new 
+
+			money = plan.Price
+			consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
+		} else {
+			if now.Sub(lastConsume.Consume_time) >= 0 {
+				return fmt.Errorf("last consume time is after now")
+			}
+
+			// by current design, plan.price must be larger than or equal 
+			// the remaining charging of the last payment.
+			ratio := float32(lastConsume.Deadline_time.Sub(now)) / float32(lastConsume.Deadline_time.Sub(lastConsume.Consume_time))
+		}
 	}
 
 	// ...

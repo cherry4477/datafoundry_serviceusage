@@ -562,6 +562,14 @@ func MoneyToConsuming(money float32) int64 {
 	return int64(money * 10000) // DON"T CHANGE
 }
 
+const (
+	// low 8 bits in ConsumeHistoryExtra_info
+	ConsumeExtraInfo_NewOrder    = 0x0
+	ConsumeExtraInfo_RenewOrder  = 0x1
+	ConsumeExtraInfo_SwitchOrder = 0x2
+	ConsumeExtraInfo_EndOrder    = 0x3
+)
+
 type ConsumeHistory struct {
 	Id                int64     `json:"_"`
 	Order_id          string    `json:"order_id,omitempty"`
@@ -574,15 +582,17 @@ type ConsumeHistory struct {
 	Region            string    `json:"region,omitempty"`
 	Plan_id           string    `json:"plan_id,omitempty"`
 	Plan_history_id   string    `json:"plan_history_id,omitempty"`
+	Extra_info        int       `json:"_"`
 }
 
-func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64) error {
+func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64, extraInfo int) error {
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
 				ID, ORDER_ID, CONSUME_ID,
 				CONSUMING, CONSUME_TIME, DEADLINE_TIME,
-				ACCOUNT_ID, REGION, PLAN_ID
+				ACCOUNT_ID, REGION, PLAN_ID, PLAN_HISTORY_ID, 
+				EXTRA_INFO
 				) values (
 				%d, '%s', %d, 
 				%d, '%s', '%s', 
@@ -591,6 +601,7 @@ func CreateConsumeHistory(db *sql.DB, orderInfo *PurchaseOrder, consumeTime time
 				orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id,
 				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, planHistoryId,
+				extraInfo,
 				)
 	_, err := db.Exec(sqlstr)
 
@@ -700,7 +711,8 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 	sql_str := fmt.Sprintf(`select
 					ID, ORDER_ID, CONSUME_ID,
 					CONSUMING, CONSUME_TIME, DEADLINE_TIME,
-					ACCOUNT_ID, REGION, PLAN_ID, PLAN_HISTORY_ID
+					ACCOUNT_ID, REGION, PLAN_ID, PLAN_HISTORY_ID,
+					EXTRA_INFO
 					from DF_CONSUMING_HISTORY
 					%s
 					limit %d
@@ -723,6 +735,7 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 			&consume.Id, &consume.Order_id, &consume.Consume_id, 
 			&consume.Consuming, &consume.Consume_time, &consume.Deadline_time, 
 			&consume.Account_id, &consume.Region, &consume.Plan_id, &consume.Plan_history_id, 
+			&consume.Extra_info,
 		)
 		if err != nil {
 			return nil, err
