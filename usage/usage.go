@@ -44,6 +44,15 @@ type PurchaseOrder struct {
 	Creator           string     `json:"creator,omitempty"`
 }
 
+func orderPO2VO(order *PurchaseOrder) {
+	order.Start_time = order.Start_time.Local()
+	order.End_time = order.End_time.Local()
+	order.Deadline_time = order.Deadline_time.Local()
+	if order.Status == OrderStatus_Ended { // ||  order.Status == OrderStatus_Ending {
+		order.EndTime = &order.End_time
+	}
+}
+
 //=============================================================
 //
 //=============================================================
@@ -72,9 +81,9 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 	}
 	*/
 
-	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
-	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
-	consumeTime := orderInfo.Deadline_time.Format("2006-01-02 15:04:05.999999")
+	startTime := orderInfo.Start_time.UTC().Format("2006-01-02 15:04:05.999999")
+	endTime := orderInfo.End_time.UTC().Format("2006-01-02 15:04:05.999999")
+	consumeTime := orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999")
 	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
 				ORDER_ID,
 				ACCOUNT_ID, REGION, 
@@ -302,7 +311,7 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 
 		// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
 
-		timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
+		timestr := deadlineTime.UTC().Format("2006-01-02 15:04:05.999999")
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
 					where ORDER_ID=?`, 
@@ -374,7 +383,7 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, extendedDuration time.Duration
 
 		// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
 
-		timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
+		timestr := deadlineTime.UTC().Format("2006-01-02 15:04:05.999999")
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
 					where ID=%d`, 
@@ -414,13 +423,13 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 	return func() error {
 		type db chan struct{} // avoid misuing db
 
-		endTimtStr := endTime.Format("2006-01-02 15:04:05.999999")
+		endTimeStr := endTime.UTC().Format("2006-01-02 15:04:05.999999")
 
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					STATUS=%d, END_TIME='%s'
 					where 
 					STATUS=%d and ID=%d and ORDER_ID=? and ACCOUNT_ID=?`, 
-					OrderStatus_Ended, endTimtStr,
+					OrderStatus_Ended, endTimeStr,
 					OrderStatus_Consuming, orderInfo.Id, 
 					)
 		result, err := tx.Exec(sqlstr,
@@ -438,11 +447,19 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 			return err
 		}
 
-		removed := n > 0
+		removed := n > 0 // n should be 1
+
 		if removed {
+			orderInfo.Last_consume_id++
+			onFailed := func() { 
+				orderInfo.Last_consume_id--
+			}
+
 			err := CreateConsumeHistory(tx, orderInfo, endTime, -remainingMoney, 
 							lastConsume.Plan_history_id, ConsumeExtraInfo_EndOrder)
 			if err != nil {
+				onFailed()
+
 				tx.Rollback()
 				return err
 			}
@@ -463,7 +480,7 @@ func RetrieveOrderByAutoGenID(db DbOrTx, orderAutoGenId int64) (*PurchaseOrder, 
 	sqlParams := make([]interface{},1)
 	sqlParams[0] = orderAutoGenId
 
-	return getSingleOrder(db, sqlWhere, sqlParams)
+	return getSingleOrder(db, sqlWhere, sqlParams...)
 }
 
 // status argument must be a valid order status value
@@ -476,7 +493,7 @@ func RetrieveOrderByID(db DbOrTx, orderId string, status int) (*PurchaseOrder, e
 		sqlParams = append(sqlParams, status)
 	}
 
-	return getSingleOrder(db, sqlWhere, sqlParams)
+	return getSingleOrder(db, sqlWhere, sqlParams...)
 }
 
 func QueryOrders(db DbOrTx, accountId string, region string, status int, renewalFailedOnly bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
@@ -700,6 +717,9 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 		if err != nil {
 			return nil, err
 		}
+		//>>
+		orderPO2VO(order)
+		//<<
 		orders = append(orders, order)
 	}
 	if err := rows.Err(); err != nil {
@@ -744,6 +764,12 @@ type ConsumeHistory struct {
 	Extra_info        int       `json:"_"`
 }
 
+func consumePO2VO(consume *ConsumeHistory) {
+	consume.Money = ConsumingToMoney(consume.Consuming)
+	consume.Consume_time = consume.Consume_time.Local()
+	consume.Deadline_time = consume.Deadline_time.Local()
+}
+
 func CreateConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64, extraInfo int) error {
 	consuming := MoneyToConsuming(money)
 
@@ -755,10 +781,11 @@ func CreateConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.
 				) values (
 				%d, '%s', %d, 
 				%d, '%s', '%s', 
-				'%s', '%s', '%s', %d
+				'%s', '%s', '%s', %d,
+				%d
 				)`, 
 				orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id,
-				consuming, consumeTime.Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.Format("2006-01-02 15:04:05.999999"), 
+				consuming, consumeTime.UTC().Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, planHistoryId,
 				extraInfo,
 				)
@@ -772,7 +799,7 @@ func RetrieveConsumeHistory(db DbOrTx, orderAutoId int64, orderId string, cunsum
 
 	sqlParams := []interface{}{orderId}
 
-	return getSingleConsuming(db, sqlWhere, sqlParams)
+	return getSingleConsuming(db, sqlWhere, sqlParams...)
 }
 
 func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region string, offset int64, limit int) (int64, []*ConsumeHistory, error) {
@@ -795,8 +822,9 @@ func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region 
 	// ...
 
 	orderBy, sortOrder := "CONSUME_TIME", SortOrder_Desc
+	orderBy2, sortOrder2 := "ID", SortOrder_Desc
 
-	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
+	sqlSort := fmt.Sprintf("%s %s, %s %s", orderBy, sortOrder, orderBy2, sortOrder2)
 
 	// ...
 
@@ -880,6 +908,7 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 		sql_where_all,
 		limit,
 		offset_str)
+
 	rows, err := db.Query(sql_str, sqlParams...)
 
 	if err != nil {
@@ -899,7 +928,9 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 		if err != nil {
 			return nil, err
 		}
-		consume.Money = ConsumingToMoney(consume.Consuming)
+		//>>
+		consumePO2VO(consume)
+		//<<
 		consumings = append(consumings, consume)
 	}
 	if err := rows.Err(); err != nil {
@@ -908,4 +939,3 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 
 	return consumings, nil
 }
-

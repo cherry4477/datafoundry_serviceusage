@@ -19,14 +19,17 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
 
 CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
 (
-   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.Id',
+   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.ID',
    ORDER_ID           VARCHAR(64) NOT NULL,
    CONSUME_ID         INT,
    CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
    CONSUME_TIME       DATETIME,
+   DEADLINE_TIME      DATETIME,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
    REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
+   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'auto gen id, important to retrieve history plan',
+   EXTRA_INFO         INT COMMENT 'one bit for: new|renew|switch',
    PRIMARY KEY (ID, ORDER_ID, CONSUME_ID)
 )  DEFAULT CHARSET=UTF8;
 

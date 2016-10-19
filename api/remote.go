@@ -108,6 +108,14 @@ func authDF(token string) (*User, error) {
 */
 
 func authDF(userToken string) (*User, error) {
+	if Debug {
+		return &User{
+			ObjectMeta: ObjectMeta {
+				Name: "local",
+			},
+		}, nil
+	}
+
 	u := &User{}
 	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
 	uri := "/users/~"

@@ -32,6 +32,8 @@ func TryToRenewConsumingOrders() <- chan time.Time {
 	// todo:
 	// find all consuming orders which deadline < now()+7_days.
 
+	// ConsumeExtraInfo_RenewOrder
+
 	return time.After(time.Hour)
 }
 
@@ -71,11 +73,12 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 	} else {
 		var remaingMoney float32
 		now := time.Now()
-		if now.Sub(lastConsume.Consume_time) >= 0 { // impossible
+
+		if now.Before(lastConsume.Consume_time) { // impossible
 
 			return fmt.Errorf("last consume time is after now")
 
-		} else if lastConsume.Deadline_time.Sub(now) < 0 {
+		} else if now.After(lastConsume.Deadline_time) {
 			remaingMoney = 0.0
 
 			// try to end last order 
@@ -95,6 +98,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 			ratio := float32(lastConsume.Deadline_time.Sub(now)) / float32(lastConsume.Deadline_time.Sub(lastConsume.Consume_time))
 			remaingMoney = ratio * lastConsume.Money
 			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
+
 			if remaingMoney > plan.Price {
 				// todo: now, withdraw is not supported
 				return fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id)
