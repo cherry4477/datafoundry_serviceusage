@@ -405,6 +405,8 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
+	// only orders in consuming status can be modified now.
+	// there should be most one consuming order for a orderId.
 	oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
@@ -419,7 +421,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	case "cancel":
 
-		oldOrderConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
+		oldOrderConsume, err := usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error() + " (old)"), nil)
 			return
@@ -427,7 +429,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 		// todo: different plan types may need different handlings
 		// todo: now, withdraw is not supported
-		err = usage.EndOrder(db, oldOrder, oldOrderConsume, 0.0)
+		err = usage.EndOrder(db, oldOrder, time.Now(), oldOrderConsume, 0.0)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
 			return
@@ -477,7 +479,9 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	order, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	//order, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	// pending orders will not be returned
+	order, err := usage.RetrieveOrderByID(db, orderId, -1)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return

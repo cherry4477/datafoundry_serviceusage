@@ -69,14 +69,17 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		paymentMoney = plan.Price
 		consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
 	} else {
+		var remaingMoney float32
 		now := time.Now()
 		if now.Sub(lastConsume.Consume_time) >= 0 { // impossible
 
 			return fmt.Errorf("last consume time is after now")
 
 		} else if lastConsume.Deadline_time.Sub(now) < 0 {
+			remaingMoney = 0.0
+
 			// try to end last order 
-			err := usage.EndOrder(db, oldOrder, lastConsume, 0.0)
+			err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
 			if err != nil {
 				return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error())
 			}
@@ -90,23 +93,24 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 			// by current design, plan.price must be larger than or equal 
 			// the remaining charging of the last payment.
 			ratio := float32(lastConsume.Deadline_time.Sub(now)) / float32(lastConsume.Deadline_time.Sub(lastConsume.Consume_time))
-			remaingMoney := ratio * lastConsume.Money
-			remaingMoney = 0.01 * float32(math.Floor(remaingMoney * 100.0))
+			remaingMoney = ratio * lastConsume.Money
+			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
 			if remaingMoney > plan.Price {
+				// todo: now, withdraw is not supported
 				return fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id)
 			}
-
-			// try to end last order 
-			err := usage.EndOrder(db, oldOrder, lastConsume, remaingMoney)
-			if err != nil {
-				return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error())
-			}
-
-			// create new one
-
-			paymentMoney = plan.Price - remaingMoney
-			consumExtraInfo = usage.ConsumeExtraInfo_SwitchOrder
 		}
+
+		// try to end last order 
+		err := usage.EndOrder(db, oldOrder, now, lastConsume, remaingMoney)
+		if err != nil {
+			return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error())
+		}
+
+		// ...
+
+		paymentMoney = plan.Price - remaingMoney
+		consumExtraInfo = usage.ConsumeExtraInfo_SwitchOrder
 	}
 
 	// ...
@@ -116,7 +120,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 		err := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason)
 		if err != nil {
-			err2 := usage.IncreaseOrderRenewalFails(db, order.Order_id)
+			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
 				Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
 			}
@@ -140,7 +144,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
 
-	order, err := usage.RenewOrder(db, orderId, extendedDuration)
+	order, err = usage.RenewOrder(db, order.Id, extendedDuration)
 	if err != nil {
 		// todo: retry
 
@@ -160,6 +164,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 	return nil
 }
 
+/*
 func renewOrder_old(accountId, orderId string, plan *Plan, renewReason string) error {
 	db := getDB()
 	if db == nil {
@@ -209,3 +214,4 @@ func renewOrder_old(accountId, orderId string, plan *Plan, renewReason string) e
 
 	return nil
 }
+*/

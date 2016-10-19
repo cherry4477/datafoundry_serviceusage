@@ -18,6 +18,7 @@ import (
 //=============================================================
 
 const (
+	// -1 means invalid status
 	OrderStatus_Pending   = 0 // DON'T change!
 	OrderStatus_Consuming = 5 // DON'T change!
 	//OrderStatus_Ending    = 10 // DON'T change!
@@ -49,6 +50,7 @@ type PurchaseOrder struct {
 
 // return the auto generated id
 func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
+	// zongsan: now pending orders will be kept in db.
 	/*
 	order, err := RetrieveOrderByID(db, orderInfo.Order_id)
 	if err != nil {
@@ -69,7 +71,6 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 		}
 	}
 	*/
-	// zongsan: now pending orders will be kept in db.
 
 	startTime := orderInfo.Start_time.Format("2006-01-02 15:04:05.999999")
 	endTime := orderInfo.End_time.Format("2006-01-02 15:04:05.999999")
@@ -151,6 +152,63 @@ func extendTime(t time.Time, extended time.Duration, startTime time.Time) time.T
 
 const MaxNumRenewalRetries = 100
 
+func IncreaseOrderRenewalFails(db *sql.DB, orderAutoGenId int64) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	
+	return func() error {
+		type db chan struct{} // avoid misuing db
+
+		order, err := RetrieveOrderByAutoGenID(tx, orderAutoGenId)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if order == nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%s) not found", orderAutoGenId)
+		}
+
+		if order.Num_renew_retires >= MaxNumRenewalRetries {
+			tx.Rollback()
+			return nil
+		}
+
+		order.Num_renew_retires ++
+
+		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+					RENEW_RETRIES=%d
+					where ID=?`, 
+					order.Num_renew_retires,
+					orderAutoGenId,
+					)
+
+		result, err := tx.Exec(sqlstr)
+		_ = result
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+
+		//n, _ := result.RowsAffected()
+		//if n < 1 {
+		//	return fmt.Errorf("order (%s) not found", orderId)
+		//}
+
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+		
+		return nil
+	}()
+}
+
+/*
+
+
 func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -188,6 +246,7 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 					)
 		_ = result
 		if err != nil {
+			tx.Rollback()
 			return err
 		}
 
@@ -204,7 +263,9 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderId string) error {
 		return nil
 	}()
 }
+*/
 
+/*
 func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -215,13 +276,14 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		type db chan struct{} // avoid misuing db
 
 		order, err := RetrieveOrderByID(tx, orderId, OrderStatus_Consuming)
+		order, err := RetrieveOrderByID(tx, orderId, -1) // also not good
 		if err != nil {
 			tx.Rollback()
 			return nil, err
 		}
 		if order == nil {
 			tx.Rollback()
-			return nil, fmt.Errorf("consuming order (id=%s) not found", orderId)
+			return nil, fmt.Errorf("order (Order_id=%s) not found", orderId)
 		}
 
 		// need checking this? This function should be only called when a payment was just made.
@@ -251,6 +313,76 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 		result, err := tx.Exec(sqlstr,
 					orderId,
 					)
+		_ = result
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
+		//n, _ := result.RowsAffected()
+		//if n < 1 {
+		//	return nil, fmt.Errorf("order (%s) not found", orderId)
+		//}
+
+		err = tx.Commit()
+		if err != nil {
+			return nil, err
+		}
+
+		onOk()
+
+		return order, nil
+	}()
+}
+*/
+
+func RenewOrder(db *sql.DB, orderAutoGenId int64, extendedDuration time.Duration) (*PurchaseOrder, error) {
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	return func() (*PurchaseOrder, error) {
+		type db chan struct{} // avoid misuing db
+
+		order, err := RetrieveOrderByAutoGenID(tx, orderAutoGenId)
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if order == nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("order (id=%d) not found", orderAutoGenId)
+		}
+
+		// need checking this? This function should be only called when a payment was just made.
+		//if order.Status != OrderStatus_Consuming && order.Status != OrderStatus_Pending {
+		//	tx.Rollback()
+		//	return fmt.Errorf("order (id=%s) not consumable", orderId)
+		//}
+
+		deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
+		lastConsumeId := order.Last_consume_id + 1
+
+		onOk := func() { 
+			order.Deadline_time = deadlineTime
+			order.Last_consume_id = lastConsumeId
+
+			// the returned order will be used to create consumeing history.
+			// so here above two feilds must be correct after the following update.
+		}
+
+		// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
+
+		timestr := deadlineTime.Format("2006-01-02 15:04:05.999999")
+		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
+					DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
+					where ID=%d`, 
+					timestr, lastConsumeId, OrderStatus_Consuming,
+					orderAutoGenId,
+					)
+
+		result, err := tx.Exec(sqlstr)
 		_ = result
 		if err != nil {
 			tx.Rollback()
@@ -326,12 +458,23 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 }
 
 // status argument must be a valid order status value
-func RetrieveOrderByID(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
-	sqlWhere := "ORDER_ID=? and STATUS=?"
+func RetrieveOrderByAutoGenID(db DbOrTx, orderAutoGenId int64) (*PurchaseOrder, error) {
+	sqlWhere := "ID=?"
+	sqlParams := make([]interface{},1)
+	sqlParams[0] = orderAutoGenId
 
-	sqlParams := make([]interface{},2)
-	sqlParams[0] = orderId
-	sqlParams[1] = status
+	return getSingleOrder(db, sqlWhere, sqlParams)
+}
+
+// status argument must be a valid order status value
+func RetrieveOrderByID(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
+	sqlWhere := "ORDER_ID=?"
+	sqlParams := make([]interface{}, 0, 2)
+	sqlParams = append(sqlParams, orderId)
+	if status >= 0 {
+		sqlWhere += " and STATUS=?"
+		sqlParams = append(sqlParams, status)
+	}
 
 	return getSingleOrder(db, sqlWhere, sqlParams)
 }
