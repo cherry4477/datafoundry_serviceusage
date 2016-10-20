@@ -103,6 +103,11 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 				// todo: now, withdraw is not supported
 				return fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id)
 			}
+
+			// ...
+
+			paymentMoney = plan.Price - remaingMoney
+			consumExtraInfo = usage.ConsumeExtraInfo_SwitchOrder
 		}
 
 		// try to end last order 
@@ -110,11 +115,6 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		if err != nil {
 			return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error())
 		}
-
-		// ...
-
-		paymentMoney = plan.Price - remaingMoney
-		consumExtraInfo = usage.ConsumeExtraInfo_SwitchOrder
 	}
 
 	// ...

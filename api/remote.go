@@ -10,8 +10,11 @@ import (
 
 	"github.com/asiainfoLDP/datahub_commons/common"
 
+
 	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
-	projectapi "github.com/openshift/origin/project/api/v1"
+	userapi "github.com/openshift/origin/pkg/user/api/v1"
+	projectapi "github.com/openshift/origin/pkg/project/api/v1"
+	kapi "k8s.io/kubernetes/pkg/api/v1"
 )
 
 //======================================================
@@ -64,59 +67,16 @@ func initGateWay() {
 // 
 //================================================================
 
-type ObjectMeta struct {
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-}
-
-type User struct {
-	ObjectMeta `json:"metadata,omitempty"`
-
-	// FullName is the full name of user
-	FullName string `json:"fullName,omitempty"`
-
-	// Identities are the identities associated with this user
-	Identities []string `json:"identities"`
-
-	// Groups are the groups that this user is a member of
-	Groups []string `json:"groups"`
-}
-
-/*
-func authDF(token string) (*User, error) {
-	url := fmt.Sprintf("%s/oapi/v1/users/~", DataFoundryHost)
-
-	response, data, err := common.RemoteCall("GET", url, token, "")
-	if err != nil {
-		Logger.Debugf("authDF error: ", err.Error())
-		return nil, err
-	}
-
-	if response.StatusCode != http.StatusOK {
-		Logger.Debugf("remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return nil, fmt.Errorf("remote (%s) status code: %d.", url, response.StatusCode)
-	}
-
-	user := new(User)
-	err = json.Unmarshal(data, user)
-	if err != nil {
-		Logger.Debugf("authDF Unmarshal error: %s. Data: %s\n", err.Error(), string(data))
-		return nil, err
-	}
-
-	return user, nil
-}
-*/
-
-func authDF(userToken string) (*User, error) {
+func authDF(userToken string) (*userapi.User, error) {
 	if Debug {
-		return &User{
-			ObjectMeta: ObjectMeta {
+		return &userapi.User{
+			ObjectMeta: kapi.ObjectMeta {
 				Name: "local",
 			},
 		}, nil
 	}
 
-	u := &User{}
+	u := &userapi.User{}
 	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
 	uri := "/users/~"
 	osRest.OGet(uri, u)
@@ -128,7 +88,7 @@ func authDF(userToken string) (*User, error) {
 	return u, nil
 }
 
-func dfUser(user *User) string {
+func dfUser(user *userapi.User) string {
 	return user.Name
 }
 
@@ -149,7 +109,7 @@ func getDFUserame(token string) (string, error) {
 // 
 //=======================================================================
 
-func getDFProject(usernameForLog, userToken, project string) (*projectapi.Project, error) {
+func getDfProject(usernameForLog, userToken, project string) (*projectapi.Project, error) {
 	p := &projectapi.Project{}
 	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
 	uri := "/projects/"+project
@@ -160,6 +120,23 @@ func getDFProject(usernameForLog, userToken, project string) (*projectapi.Projec
 	}
 
 	return p, nil
+}
+
+//================================================================
+// 
+//================================================================
+
+func changeDfProjectQuota(usernameForLog, userToken string, plan *Plan) error {
+
+	quota := kapi.ResourceQuota {
+
+	}
+	_ = quota
+	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	//uri := PUT /api/v1/namespaces/{namespace}/resourcequotas/{name}
+
+	
+	return nil
 }
 
 //=======================================================================

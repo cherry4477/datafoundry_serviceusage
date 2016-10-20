@@ -245,7 +245,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+		_, err = getDfProject(username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -398,7 +398,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err = getDFProject(username, r.Header.Get("Authorization"), accountId)
+		_, err = getDfProject(username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -465,7 +465,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 	}
 
 	// check if user can manipulate project or not
-	_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+	_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 		return
@@ -521,7 +521,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+		_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -627,7 +627,7 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err := getDFProject(username, r.Header.Get("Authorization"), accountId)
+		_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
