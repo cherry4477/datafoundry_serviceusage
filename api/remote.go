@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 	"strings"
+	"errors"
+	"strconv"
 
 	"github.com/asiainfoLDP/datahub_commons/common"
 
@@ -15,6 +17,7 @@ import (
 	userapi "github.com/openshift/origin/pkg/user/api/v1"
 	projectapi "github.com/openshift/origin/pkg/project/api/v1"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
+	kapiresource "k8s.io/kubernetes/pkg/api/resource"
 )
 
 //======================================================
@@ -126,16 +129,86 @@ func getDfProject(usernameForLog, userToken, project string) (*projectapi.Projec
 // 
 //================================================================
 
-func changeDfProjectQuota(usernameForLog, userToken string, plan *Plan) error {
+// The following identify resource constants for Kubernetes object types
+const (
+	// Pods, number
+	ResourcePods kapi.ResourceName = "pods"
+	// Services, number
+	ResourceServices kapi.ResourceName = "services"
+	// ReplicationControllers, number
+	ResourceReplicationControllers kapi.ResourceName = "replicationcontrollers"
+	// ResourceQuotas, number
+	ResourceQuotas kapi.ResourceName = "resourcequotas"
+	// ResourceSecrets, number
+	ResourceSecrets kapi.ResourceName = "secrets"
+	// ResourceConfigMaps, number
+	ResourceConfigMaps kapi.ResourceName = "configmaps"
+	// ResourcePersistentVolumeClaims, number
+	ResourcePersistentVolumeClaims kapi.ResourceName = "persistentvolumeclaims"
+	// ResourceServicesNodePorts, number
+	ResourceServicesNodePorts kapi.ResourceName = "services.nodeports"
+	// ResourceServicesLoadBalancers, number
+	ResourceServicesLoadBalancers kapi.ResourceName = "services.loadbalancers"
+	// CPU request, in cores. (500m = .5 cores)
+	ResourceRequestsCPU kapi.ResourceName = "requests.cpu"
+	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceRequestsMemory kapi.ResourceName = "requests.memory"
+	// CPU limit, in cores. (500m = .5 cores)
+	ResourceLimitsCPU kapi.ResourceName = "limits.cpu"
+	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
+	ResourceLimitsMemory kapi.ResourceName = "limits.memory"
+)
 
-	quota := kapi.ResourceQuota {
+const ProjectQuotaName = "quota"
 
+func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
+
+	// ...
+
+	cpus, mems, err := plan.ParsePlanQuotas()
+	if err != nil {
+		return err
 	}
-	_ = quota
-	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
-	//uri := PUT /api/v1/namespaces/{namespace}/resourcequotas/{name}
 
+	const Gi = int64(1) << 30
+	cpuQuantity := *kapiresource.NewQuantity(int64(cpus), kapiresource.DecimalExponent)
+	memQuantity := *kapiresource.NewQuantity(int64(mems)*Gi, kapiresource.BinarySI)
+
+	quota := kapi.ResourceQuota {}
+	quota.Kind = "ResourceQuota"
+	quota.APIVersion = "v1"
+	quota.Name = ProjectQuotaName
+	quota.Spec.Hard = kapi.ResourceList {
+		ResourceLimitsCPU:      cpuQuantity,
+		ResourceLimitsMemory:   memQuantity,
+		ResourceRequestsCPU:    cpuQuantity,
+		ResourceRequestsMemory: memQuantity,
+	}
 	
+	// ...
+	
+	uri := "/namespaces/" + project + "/resourcequotas"
+
+	osRest := openshift.NewOpenshiftREST(nil)
+
+	// delete all quotas
+
+	osRest.KDelete(uri, nil)
+	if osRest.Err != nil {
+		Logger.Warningf("delete quota (%s) error: %s", uri, osRest.Err)
+
+		return osRest.Err
+	}
+
+	// create new one
+
+	osRest.KPost(uri, &quota, nil)
+	if osRest.Err != nil {
+		Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
+
+		return osRest.Err
+	}
+
 	return nil
 }
 
@@ -162,6 +235,37 @@ type Plan struct {
 	Region_describe string    `json:"region_describe,omitempty"`
 	Create_time     time.Time `json:"creation_time,omitempty"`
 	Status          string    `json:"status,omitempty"`
+}
+
+func (plan *Plan) ParsePlanQuotas() (int, int, error) {
+	//"specification1": "16 CPU Cores",
+	//"specification2": "32 GB RAM"，
+
+	if plan.Plan_type != PLanType_Quota {
+		return 0, 0, errors.New("not a quota plan")
+	}
+	
+	var index int
+
+	index = strings.Index(plan.Specification1, " CPU Cores")
+	if index < 0 {
+		return 0, 0, errors.New("invalid cpu format")
+	}
+	cpus, err := strconv.Atoi(plan.Specification1[:index])
+	if err != nil || cpus < 0 {
+		return 0, 0, errors.New("invalid cpu format.")
+	}
+	
+	index = strings.Index(plan.Specification2, " GB RAM")
+	if index < 0 {
+		return 0, 0, errors.New("invalid memory format")
+	}
+	mems, err := strconv.Atoi(plan.Specification2[:index])
+	if err != nil || mems < 0 {
+		return 0, 0, errors.New("invalid memory format.")
+	}
+
+	return cpus, mems, nil
 }
 
 // todo: add historyId to retrieve history info?

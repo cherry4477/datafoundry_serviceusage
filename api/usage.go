@@ -436,6 +436,8 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 			return
 		}
 
+		// todo: modify quota to zero
+
 	}
 
 	JsonResult(w, http.StatusOK, nil, nil)

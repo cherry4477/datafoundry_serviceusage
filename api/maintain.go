@@ -34,6 +34,8 @@ func TryToRenewConsumingOrders() <- chan time.Time {
 
 	// ConsumeExtraInfo_RenewOrder
 
+	// if order is expired, change quota to 0
+
 	return time.After(time.Hour)
 }
 
@@ -164,6 +166,23 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
 		return err
 	}
+
+	// modify quota
+
+	go func() {
+		switch consumExtraInfo {
+		case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
+			err := changeDfProjectQuota(order.Creator, accountId, plan)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("changeDfProjectQuota (%s, %s, %s) error: %s", 
+					order.Creator, accountId, plan.Plan_id, err.Error())
+			}
+		}
+	}()
+
+	// ...
 
 	return nil
 }
