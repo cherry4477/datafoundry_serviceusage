@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
    CONSUME_TIME       DATETIME,
    DEADLINE_TIME      DATETIME,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
-   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   REGION             VARCHAR(32) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
    PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'auto gen id, important to retrieve history plan',
    EXTRA_INFO         INT COMMENT 'one bit for: new|renew|switch',
