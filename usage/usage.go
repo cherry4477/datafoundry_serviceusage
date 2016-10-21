@@ -189,7 +189,7 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderAutoGenId int64) error {
 
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					RENEW_RETRIES=%d
-					where ID=?`, 
+					where ID=%d`, 
 					order.Num_renew_retires,
 					orderAutoGenId,
 					)
@@ -500,6 +500,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
+	
 
 	sqlWhere := ""
 	if accountId != "" {
@@ -517,14 +518,17 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 			sqlWhere = sqlWhere + fmt.Sprintf(" and STATUS=%d", status)
 		}
 	}
+
+
 	if region != "" {
 		if sqlWhere == "" {
-			sqlWhere = fmt.Sprintf("REGION=?", region)
+			sqlWhere = fmt.Sprintf("REGION=?")
 		} else {
-			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
+			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?")
 		}
 		sqlParams = append(sqlParams, region)
 	}
+
 	if renewalFailedOnly {
 		if sqlWhere == "" {
 			sqlWhere = "RENEW_RETRIES>0"
@@ -815,7 +819,7 @@ func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region 
 		sqlParams = append(sqlParams, orderId)
 	}
 	if region != "" {
-		sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
+		sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?")
 		sqlParams = append(sqlParams, region)
 	}
 
