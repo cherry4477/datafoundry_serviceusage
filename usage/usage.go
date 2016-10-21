@@ -519,7 +519,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		}
 	}
 
-	println("============ sqlWhere 0000 =", region)
+	println("============ sqlWhere 0000 =", sqlWhere)
 
 	println("============ region =", region)
 
@@ -532,7 +532,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		sqlParams = append(sqlParams, region)
 	}
 
-	println("============ sqlWhere 111 =", region)
+	println("============ sqlWhere 111 =", sqlWhere)
 	if renewalFailedOnly {
 		if sqlWhere == "" {
 			sqlWhere = "RENEW_RETRIES>0"
@@ -541,7 +541,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		}
 	}
 
-	println("============ sqlWhere 2222 =", region)
+	println("============ sqlWhere 2222 =", sqlWhere)
 
 	// filter out pending orders
 	if sqlWhere == "" {
