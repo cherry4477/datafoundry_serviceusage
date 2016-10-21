@@ -289,9 +289,15 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
 	}
-	if oldOrder != nil && oldOrder.Plan_id == planId {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Plan not changed"), nil)
-		return
+	if oldOrder != nil {
+		if oldOrder.Plan_id == planId {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Plan not changed"), nil)
+			return
+		}
+		if oldOrder.Region == plan.Region {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Region not switchable"), nil)
+			return
+		}
 	}
 
 	// create new order (in pending status)
@@ -301,7 +307,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	endTime := now
 	deadlineTime := now
 
-	order := &usage.PurchaseOrder{
+	order := &usage.PurchaseOrder {
 		Order_id: orderId,
 		Account_id: accountId,
 
