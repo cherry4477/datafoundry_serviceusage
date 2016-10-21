@@ -238,14 +238,14 @@ func getPlanByID(planId string) (*Plan, error) {
 // 
 //=======================================================================
 
-func makePayment(adminToken, accountId string, money float32, reason string) error {
+func makePayment(adminToken, accountId string, money float32, reason, region string) error {
 	if Debug {
 		return nil
 	}
 
 	body := fmt.Sprintf(
-		`{"namespace":"%s","amount":%.3f,"reason":"%s"}`, 
-		accountId, money, reason,
+		`{"namespace":"%s","amount":%.3f,"reason":"%s", "region":"%s"}`, 
+		accountId, money, reason, region, 
 		)
 	url := fmt.Sprintf("%s/charge/v1/recharge?type=deduction", RechargeSercice)
 	

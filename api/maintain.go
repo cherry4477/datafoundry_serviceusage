@@ -122,7 +122,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 	if paymentMoney > 0.0 {
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
 
-		err := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason)
+		err := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason, order.Region)
 		if err != nil {
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
