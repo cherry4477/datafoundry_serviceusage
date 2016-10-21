@@ -540,6 +540,8 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		sqlWhere = sqlWhere + " and EVER_PAYED=1"
 	}
 
+println("===== sqlWhere = ", sqlWhere)
+
 	// ...
 
 	orderBy, sortOrder := "", ""
@@ -693,7 +695,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 		limit,
 		offset_str)
 	
-	// println("sql_str = ", sql_str)
+	 println("sql_str = ", sql_str)
 
 	rows, err := db.Query(sql_str, sqlParams...)
 
