@@ -519,20 +519,16 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		}
 	}
 
-	println("============ sqlWhere 0000 =", sqlWhere)
-
-	println("============ region =", region)
 
 	if region != "" {
 		if sqlWhere == "" {
-			sqlWhere = fmt.Sprintf("REGION=?", region)
+			sqlWhere = fmt.Sprintf("REGION=?")
 		} else {
-			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
+			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?")
 		}
 		sqlParams = append(sqlParams, region)
 	}
 
-	println("============ sqlWhere 111 =", sqlWhere)
 	if renewalFailedOnly {
 		if sqlWhere == "" {
 			sqlWhere = "RENEW_RETRIES>0"
@@ -540,8 +536,6 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 			sqlWhere = sqlWhere + " and RENEW_RETRIES>0"
 		}
 	}
-
-	println("============ sqlWhere 2222 =", sqlWhere)
 
 	// filter out pending orders
 	if sqlWhere == "" {
@@ -825,7 +819,7 @@ func QueryConsumeHistories(db *sql.DB, accountId string, orderId string, region 
 		sqlParams = append(sqlParams, orderId)
 	}
 	if region != "" {
-		sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?", region)
+		sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?")
 		sqlParams = append(sqlParams, region)
 	}
 
