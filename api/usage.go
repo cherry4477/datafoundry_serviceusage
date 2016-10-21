@@ -119,13 +119,8 @@ func validatePlanID(planId string) (string, *Error) {
 }
 
 func validateRegion(region string) (string, *Error) {
-	switch region {
-	default:
-		return "", newInvalidParameterError("invalid region parameter")
-	case "bj":
-	}
-
-	return region, nil
+	region, e := _mustStringParam("region", region, 50, StringParamType_UrlWord)
+	return region, e
 }
 
 const (
