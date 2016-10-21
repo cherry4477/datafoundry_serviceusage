@@ -189,7 +189,7 @@ func IncreaseOrderRenewalFails(db *sql.DB, orderAutoGenId int64) error {
 
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					RENEW_RETRIES=%d
-					where ID=?`, 
+					where ID=%d`, 
 					order.Num_renew_retires,
 					orderAutoGenId,
 					)

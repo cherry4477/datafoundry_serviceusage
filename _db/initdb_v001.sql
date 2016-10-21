@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    ID                 BIGINT NOT NULL AUTO_INCREMENT,
    ORDER_ID           VARCHAR(64) NOT NULL,
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
-   REGION             VARCHAR(4) NOT NULL COMMENT 'for query',
+   REGION             VARCHAR(32) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL,
    PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
    START_TIME         DATETIME,
