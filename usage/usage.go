@@ -500,6 +500,7 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
+	
 
 	sqlWhere := ""
 	if accountId != "" {
@@ -517,6 +518,11 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 			sqlWhere = sqlWhere + fmt.Sprintf(" and STATUS=%d", status)
 		}
 	}
+
+	println("============ sqlWhere 0000 =", region)
+
+	println("============ region =", region)
+
 	if region != "" {
 		if sqlWhere == "" {
 			sqlWhere = fmt.Sprintf("REGION=?", region)
@@ -525,6 +531,8 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		}
 		sqlParams = append(sqlParams, region)
 	}
+
+	println("============ sqlWhere 111 =", region)
 	if renewalFailedOnly {
 		if sqlWhere == "" {
 			sqlWhere = "RENEW_RETRIES>0"
@@ -533,14 +541,14 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 		}
 	}
 
+	println("============ sqlWhere 2222 =", region)
+
 	// filter out pending orders
 	if sqlWhere == "" {
 		sqlWhere = "EVER_PAYED=1"
 	} else {
 		sqlWhere = sqlWhere + " and EVER_PAYED=1"
 	}
-
-println("===== sqlWhere = ", sqlWhere)
 
 	// ...
 
@@ -695,7 +703,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 		limit,
 		offset_str)
 	
-	 println("sql_str = ", sql_str)
+	// println("sql_str = ", sql_str)
 
 	rows, err := db.Query(sql_str, sqlParams...)
 
