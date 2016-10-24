@@ -61,9 +61,9 @@ func initGateWay() {
 	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR", "")
 	openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
 
-	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, "DATAFOUNDRYPAYMENT_SERVICE_HOST", "DATAFOUNDRYPAYMENT_SERVICE_PORT")
-	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, "DATAFOUNDRYPLAN_SERVICE_HOST", "DATAFOUNDRYPLAN_SERVICE_PORT")
-	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, "DATAFOUNDRYRECHARGE_SERVICE_HOST", "DATAFOUNDRYRECHARGE_SERVICE_PORT_8090_TCP")
+	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT"))
+	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT"))
+	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT"))
 }
 
 //================================================================
@@ -288,7 +288,7 @@ func getPlanByID(planId string) (*Plan, error) {
 	
 	response, data, err := common.RemoteCall("GET", url, "", "")
 	if err != nil {
-		Logger.Infof("getPlan error: ", err.Error())
+		Logger.Infof("getPlan error: %s", err.Error())
 		return nil, err
 	}
 
@@ -332,7 +332,7 @@ func makePayment(adminToken, accountId string, money float32, reason, region str
 	
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {
-		Logger.Infof("makePayment error: ", err.Error())
+		Logger.Infof("makePayment error: %s", err.Error())
 		return err
 	}
 
