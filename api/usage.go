@@ -294,7 +294,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Plan not changed"), nil)
 			return
 		}
-		if oldOrder.Region == plan.Region {
+		if oldOrder.Region != plan.Region {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Region not switchable"), nil)
 			return
 		}

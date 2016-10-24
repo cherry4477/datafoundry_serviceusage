@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/api"
-	"github.com/asiainfoLDP/datahub_commons/httputil"
 	"github.com/asiainfoLDP/datahub_commons/log"
 )
 
@@ -107,5 +105,5 @@ func main() {
 	service := newService(*port)
 	address := fmt.Sprintf(":%d", service.httpPort)
 	log.DefaultLogger().Infof("Listening http at: %s\n", address)
-	log.DefaultLogger().Fatal(http.ListenAndServe(address, httputil.TimeoutHandler(router, 10000*time.Millisecond, ""))) // will block here
+	log.DefaultLogger().Fatal(http.ListenAndServe(address, router)) // will block here
 }

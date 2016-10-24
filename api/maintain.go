@@ -19,6 +19,7 @@ func StartMaintaining() {
 	Logger.Infof("Maintaining service started.")
 
 	timerRenewOrders := time.After(time.Minute)
+	
 	for {
 		select {
 		case <-timerRenewOrders:
