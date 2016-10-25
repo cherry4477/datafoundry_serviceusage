@@ -477,17 +477,34 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 // status argument must be a valid order status value
 func RetrieveOrderByAutoGenID(db DbOrTx, orderAutoGenId int64) (*PurchaseOrder, error) {
 	sqlWhere := "ID=?"
-	sqlParams := make([]interface{},1)
-	sqlParams[0] = orderAutoGenId
+	sqlParams := make([]interface{}, 0, 1)
+	sqlParams = append(sqlParams, orderAutoGenId)
 
 	return getSingleOrder(db, sqlWhere, sqlParams...)
 }
 
 // status argument must be a valid order status value
-func RetrieveOrderByID(db DbOrTx, orderId string, status int) (*PurchaseOrder, error) {
-	sqlWhere := "ORDER_ID=?"
+func RetrieveOrderByStatusAndAutoGenID(db DbOrTx, orderAutoGenId int64, status int) (*PurchaseOrder, error) {
+	sqlWhere := "ID=?"
 	sqlParams := make([]interface{}, 0, 2)
+	sqlParams = append(sqlParams, orderAutoGenId)
+	if status >= 0 {
+		sqlWhere += " and STATUS=?"
+		sqlParams = append(sqlParams, OrderStatus_Consuming)
+	}
+
+	return getSingleOrder(db, sqlWhere, sqlParams...)
+}
+
+// status argument must be a valid order status value
+func RetrieveOrderByID(db DbOrTx, orderId, region string, status int) (*PurchaseOrder, error) {
+	sqlWhere := "ORDER_ID=?"
+	sqlParams := make([]interface{}, 0, 3)
 	sqlParams = append(sqlParams, orderId)
+	if region != "" {
+		sqlWhere += " and REGION=?"
+		sqlParams = append(sqlParams, region)
+	}
 	if status >= 0 {
 		sqlWhere += " and STATUS=?"
 		sqlParams = append(sqlParams, status)

@@ -94,9 +94,15 @@ func validateOrderMode(modeName string) (int, *Error) {
 }
 */
 
+func validateOrderAutoGenID(idstr string) (int64, *Error) {
+	// GetError2(ErrorCodeInvalidParameters, err.Error())
+	id, e := _mustIntParam("id", idstr)
+	return id, e
+}
+
 func validateOrderID(orderId string) (string, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
-	orderId, e := _mustStringParam("id", orderId, 50, StringParamType_UrlWord)
+	orderId, e := _mustStringParam("orderId", orderId, 50, StringParamType_UrlWord)
 	return orderId, e
 }
 
@@ -284,7 +290,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if there is an old order
 
-	oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	oldOrder, err := usage.RetrieveOrderByID(db, orderId, plan.Region, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
@@ -294,10 +300,10 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, "Plan not changed"), nil)
 			return
 		}
-		if oldOrder.Region != plan.Region {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, fmt.Sprintf("Region not switchable (%s -> %s)", oldOrder.Region, plan.Region)), nil)
-			return
-		}
+		//if oldOrder.Region != plan.Region {
+		//	JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, fmt.Sprintf("Region not switchable (%s -> %s)", oldOrder.Region, plan.Region)), nil)
+		//	return
+		//}
 	}
 
 	// create new order (in pending status)
@@ -377,7 +383,12 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	orderId, e := validateOrderID(params.ByName("order_id"))
+	//orderId, e := validateOrderID(params.ByName("order_id"))
+	//if e != nil {
+	//	JsonResult(w, http.StatusBadRequest, e, nil)
+	//	return
+	//}
+	id, e := validateOrderAutoGenID(params.ByName("id"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -412,7 +423,8 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// only orders in consuming status can be modified now.
 	// there should be most one consuming order for a orderId.
-	oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	//oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	oldOrder, err := usage.RetrieveOrderByStatusAndAutoGenID(db, id, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
@@ -480,7 +492,12 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	// ...
 
-	orderId, e := validateOrderID(params.ByName("order_id"))
+	//orderId, e := validateOrderID(params.ByName("order_id"))
+	//if e != nil {
+	//	JsonResult(w, http.StatusBadRequest, e, nil)
+	//	return
+	//}
+	id, e := validateOrderAutoGenID(params.ByName("id"))
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
@@ -488,7 +505,7 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 	//order, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
 	// pending orders will not be returned
-	order, err := usage.RetrieveOrderByID(db, orderId, -1)
+	order, err := usage.RetrieveOrderByStatusAndAutoGenID(db, id, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
