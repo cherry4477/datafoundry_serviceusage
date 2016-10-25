@@ -99,7 +99,11 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		} else {
 			// by current design, plan.price must be larger than or equal 
 			// the remaining charging of the last payment.
-			ratio := float32(lastConsume.Deadline_time.Sub(now)) / float32(lastConsume.Deadline_time.Sub(lastConsume.Consume_time))
+			const Hours24 = time.Hour * 24
+
+			days := math.Ceil(float64(lastConsume.Deadline_time.Sub(now) / Hours24))
+			allDays := math.Floor(0.5 + float64(lastConsume.Deadline_time.Sub(lastConsume.Consume_time)))
+			ratio := float32(days) / float32(allDays)
 			remaingMoney = ratio * lastConsume.Money
 			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
 
