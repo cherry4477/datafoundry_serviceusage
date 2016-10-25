@@ -37,6 +37,7 @@ const (
 	ErrorCodeRenewOrder            = 3313
 	ErrorCodeQueryConsumings       = 3314
 	ErrorCodeGetPlan               = 3315
+	ErrorCodeInsufficentBalance    = 3316 // DON'T CHAGNE	
 
 
 
@@ -65,6 +66,8 @@ func init() {
 	initError(ErrorCodeQueryConsumings, "failed to consuming history")
 
 	initError(ErrorCodeGetPlan, "failed to get plan")
+
+	initError(ErrorCodeInsufficentBalance, "insufficient balance")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)

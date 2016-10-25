@@ -332,9 +332,13 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	err = renewOrder(db, accountId, order, plan, oldOrder)
+	err, insufficientBalance := renewOrder(db, accountId, order, plan, oldOrder)
 	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeRenewOrder, err.Error()), nil)
+		var errCode uint = ErrorCodeRenewOrder
+		if insufficientBalance {
+			errCode = ErrorCodeInsufficentBalance
+		}
+		JsonResult(w, http.StatusBadRequest, GetError2(errCode, err.Error()), nil)
 		return
 	}
 

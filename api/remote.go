@@ -319,9 +319,12 @@ func getPlanByID(planId string) (*Plan, error) {
 // 
 //=======================================================================
 
-func makePayment(adminToken, accountId string, money float32, reason, region string) error {
+const ErrorCodeUpdateBalance = 1309
+
+// the return bool means insufficient balance or not
+func makePayment(adminToken, accountId string, money float32, reason, region string) (error, bool) {
 	if Debug {
-		return nil
+		return nil, false
 	}
 
 	body := fmt.Sprintf(
@@ -333,13 +336,19 @@ func makePayment(adminToken, accountId string, money float32, reason, region str
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {
 		Logger.Infof("makePayment error: %s", err.Error())
-		return err
+		return err, false
 	}
 
 	if response.StatusCode != http.StatusOK {
+		insufficentData := false
+		r := &Result{}
+		if json.Unmarshal(data, &r) == nil {
+			insufficentData = (r.Code == ErrorCodeUpdateBalance)
+		}
+
 		Logger.Infof("makePayment remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return fmt.Errorf("makePayment remote (%s) status code: %d.", url, response.StatusCode)
+		return fmt.Errorf("makePayment remote (%s) status code: %d.", url, response.StatusCode), insufficentData
 	}
 	
-	return nil
+	return nil, false
 }
