@@ -159,7 +159,7 @@ const (
 	ResourceLimitsMemory kapi.ResourceName = "limits.memory"
 )
 
-const ProjectQuotaName = "quota"
+const ProjectCpuMemoryQuotaName = "standard-quota"
 
 func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 
@@ -177,7 +177,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 	quota := kapi.ResourceQuota {}
 	quota.Kind = "ResourceQuota"
 	quota.APIVersion = "v1"
-	quota.Name = ProjectQuotaName
+	quota.Name = ProjectCpuMemoryQuotaName
 	quota.Spec.Hard = kapi.ResourceList {
 		ResourceLimitsCPU:      cpuQuantity,
 		ResourceLimitsMemory:   memQuantity,
@@ -191,6 +191,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 
 	osRest := openshift.NewOpenshiftREST(nil)
 
+	/*
 	// delete all quotas
 
 	osRest.KDelete(uri, nil)
@@ -205,6 +206,16 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 	osRest.KPost(uri, &quota, nil)
 	if osRest.Err != nil {
 		Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
+
+		return osRest.Err
+	}
+	*/
+
+	// update quota
+
+	osRest.KPut(uri + "/" + ProjectCpuMemoryQuotaName, &quota, nil)
+	if osRest.Err != nil {
+		Logger.Warningf("update quota (%s) error: %s", uri, osRest.Err)
 
 		return osRest.Err
 	}
