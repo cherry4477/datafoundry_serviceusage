@@ -101,9 +101,9 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 			// the remaining charging of the last payment.
 			const DayDuration = float64(time.Hour * 24)
 
-			days := math.Ceil(float64(lastConsume.Deadline_time.Sub(now)) / DayDuration)
+			remainingDays := math.Floor(float64(lastConsume.Deadline_time.Sub(now)) / DayDuration)
 			allDays := math.Floor(0.5 + float64(lastConsume.Deadline_time.Sub(lastConsume.Consume_time)) / DayDuration)
-			ratio := float32(days) / float32(allDays)
+			ratio := float32(remainingDays) / float32(allDays)
 			remaingMoney = ratio * lastConsume.Money
 			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
 
