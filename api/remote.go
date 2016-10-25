@@ -191,6 +191,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 
 	osRest := openshift.NewOpenshiftREST(nil)
 
+	// the old implementation: delete all then create new one
 	/*
 	// delete all quotas
 
@@ -211,14 +212,40 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 	}
 	*/
 
-	// update quota
+	// the new implementation: check existance, create on not found, update on found
 
-	osRest.KPut(uri + "/" + ProjectCpuMemoryQuotaName, &quota, nil)
+	fullUri := uri + "/" + ProjectCpuMemoryQuotaName
+
+	oldQuota := kapi.ResourceQuota {}
+	osRest.KGet(fullUri, &oldQuota)
 	if osRest.Err != nil {
-		Logger.Warningf("update quota (%s) error: %s", uri, osRest.Err)
+		if osRest.StatusCode != 404 {
+			Logger.Warningf("get quota (%s) error: %s", fullUri, osRest.Err)
 
-		return osRest.Err
+			return osRest.Err
+		}
+
+		// create new
+		osRest = openshift.NewOpenshiftREST(nil)
+		osRest.KPost(uri, &quota, nil) 
+		if osRest.Err != nil {
+			Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
+
+			return osRest.Err
+		}
+	} else {
+		// todo: if old and new are equal, do nothing
+
+		// update quota
+		osRest = openshift.NewOpenshiftREST(nil)
+		osRest.KPut(fullUri, &quota, nil)
+		if osRest.Err != nil {
+			Logger.Warningf("update quota (%s) error: %s", fullUri, osRest.Err)
+
+			return osRest.Err
+		}
 	}
+	 
 
 	return nil
 }
