@@ -49,7 +49,7 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 }
 
 // the return bool means insufficient balance or not
-func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (error, bool) {
+func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
 	var err error
 	var lastConsume *usage.ConsumeHistory
 	if oldOrder != nil {
@@ -57,11 +57,11 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 		lastConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
 		if err != nil {
-			return fmt.Errorf("Failed to switch plan: " + err.Error()), false
+			return 0.0, fmt.Errorf("Failed to switch plan: " + err.Error()), false
 		}
 
 		if lastConsume == nil {
-			return fmt.Errorf("Failed to switch plan: last payment not found"), false
+			return 0.0, fmt.Errorf("Failed to switch plan: last payment not found"), false
 		}
 	}
 
@@ -80,7 +80,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 		if now.Before(lastConsume.Consume_time) { // impossible
 
-			return fmt.Errorf("last consume time is after now"), false
+			return 0.0, fmt.Errorf("last consume time is after now"), false
 
 		} else if now.After(lastConsume.Deadline_time) {
 			remaingMoney = 0.0
@@ -88,7 +88,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 			// try to end last order 
 			err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
 			if err != nil {
-				return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+				return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
 			}
 
 			// create new 
@@ -109,7 +109,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 			if remaingMoney > plan.Price {
 				// todo: now, withdraw is not supported
-				return fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), false
+				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), false
 			}
 
 			// ...
@@ -121,8 +121,23 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		// try to end last order 
 		err := usage.EndOrder(db, oldOrder, now, lastConsume, remaingMoney)
 		if err != nil {
-			return fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+			return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
 		}
+	}
+
+	if drytry {
+		return paymentMoney, nil, false
+	}
+
+	// ...
+	
+	var extendedDuration time.Duration
+
+	switch plan.Cycle {
+	default:
+		return paymentMoney, fmt.Errorf("unknown plan cycle: %s", plan.Cycle), false
+	case PLanCircle_Month:
+		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
 
 	// ...
@@ -137,7 +152,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 				Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
 			}
 
-			return err, insufficientBalance
+			return 0.0, err, insufficientBalance
 		}
 
 		order.Last_consume_id = order.Last_consume_id + 1
@@ -145,24 +160,15 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 	// ...
 
-	now := time.Now()
-	
-	var extendedDuration time.Duration
-
-	switch plan.Cycle {
-	default:
-		return fmt.Errorf("unknown plan cycle: %s", plan.Cycle), false
-	case PLanCircle_Month:
-		extendedDuration = usage.DeadlineExtendedDuration_Month
-	}
-
 	order, err = usage.RenewOrder(db, order.Id, extendedDuration)
 	if err != nil {
 		// todo: retry
 
 		Logger.Warningf("RenewOrder error: %s", err.Error())
-		return err, false
+		return paymentMoney, err, false
 	}
+
+	now := time.Now()
 
 	// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
 	err = usage.CreateConsumeHistory(db, order, now, plan.Price, plan.Id, consumExtraInfo)
@@ -170,7 +176,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 		// todo: retry
 
 		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
-		return err, false
+		return paymentMoney, err, false
 	}
 
 	// modify quota
@@ -190,7 +196,7 @@ func renewOrder(db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *
 
 	// ...
 
-	return nil, false
+	return paymentMoney, nil, false
 }
 
 /*

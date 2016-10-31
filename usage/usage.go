@@ -26,7 +26,7 @@ const (
 )
 
 type PurchaseOrder struct {
-	Id                int64      `json:"_"`
+	Id                int64      `json:"id,omitempty"`
 	Order_id          string     `json:"order_id,omitempty"`
 	Account_id        string     `json:"project,omitempty"` // accountId
 	Region            string     `json:"region,omitempty"`

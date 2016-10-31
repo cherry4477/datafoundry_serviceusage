@@ -306,6 +306,9 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		//}
 	}
 
+	// drytry=1: don't create order actually
+	drytry := r.FormValue("drytry") == "1"
+
 	// create new order (in pending status)
 
 	now := time.Now()
@@ -330,15 +333,17 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		Creator: creator,
 	}
 
-	order.Id, err = usage.CreateOrder(db, order)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, err.Error()), nil)
-		return
+	if !drytry {
+		order.Id, err = usage.CreateOrder(db, order)
+		if err != nil {
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCreateOrder, err.Error()), nil)
+			return
+		}
 	}
 
 	// make the payment
 
-	err, insufficientBalance := renewOrder(db, accountId, order, plan, oldOrder)
+	paymentMoney, err, insufficientBalance := renewOrder(drytry, db, accountId, order, plan, oldOrder)
 	if err != nil {
 		var errCode uint = ErrorCodeRenewOrder
 		if insufficientBalance {
@@ -350,7 +355,15 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	JsonResult(w, http.StatusOK, nil, order)
+	result := struct {
+		Money string               `json:"money,omitempty"`
+		Order *usage.PurchaseOrder `json:"order,omitempty"`
+	}{
+		fmt.Sprint("%.2f", paymentMoney),
+		order,
+	}
+
+	JsonResult(w, http.StatusOK, nil, result)
 }
 
 type OrderModification struct {
