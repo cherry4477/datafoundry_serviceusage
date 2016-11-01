@@ -353,6 +353,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
+fmt.Println("zzz paymentMoney =", paymentMoney)
+
 	// ...
 
 	result := struct {

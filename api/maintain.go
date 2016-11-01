@@ -71,18 +71,23 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	var consumExtraInfo int
 	var paymentMoney float32
 
+fmt.Println("aaa")
 	if lastConsume == nil {
+fmt.Println("bbb")
 		paymentMoney = plan.Price
 		consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
 	} else {
+fmt.Println("ccc")
 		var remaingMoney float32
 		now := time.Now()
 
 		if now.Before(lastConsume.Consume_time) { // impossible
+fmt.Println("ddd")
 
 			return 0.0, fmt.Errorf("last consume time is after now"), false
 
 		} else if now.After(lastConsume.Deadline_time) {
+fmt.Println("eee")
 			remaingMoney = 0.0
 
 			// try to end last order 
@@ -97,6 +102,7 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 			consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
 
 		} else {
+fmt.Println("fff")
 			// by current design, plan.price must be larger than or equal 
 			// the remaining charging of the last payment.
 			const DayDuration = float64(time.Hour * 24)
@@ -108,9 +114,11 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
 
 			if remaingMoney > plan.Price {
+fmt.Println("ggg")
 				// todo: now, withdraw is not supported
 				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), false
 			}
+fmt.Println("hhh ratio=", ratio)
 
 			// ...
 
@@ -124,6 +132,7 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 			return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
 		}
 	}
+fmt.Println("iii paymentMoney=", paymentMoney)
 
 	if drytry {
 		return paymentMoney, nil, false
