@@ -531,11 +531,14 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	// ...
 
+fmt.Println("000:", time.Now())
 	db := getDB()
 	if db == nil {
 		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
 		return
 	}
+
+fmt.Println("111:", time.Now())
 
 	// auth
 
@@ -599,11 +602,15 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
+fmt.Println("222:", time.Now())
+
 	count, orders, err := usage.QueryOrders(db, accountId, region, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
 	}
+
+fmt.Println("333:", time.Now())
 
 	for _, o := range orders {
 		o.StatusLabel = orderStatusToLabel(o.Status)

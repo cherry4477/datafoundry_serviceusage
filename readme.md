@@ -38,10 +38,10 @@ Return Result (json):
 ```
 code: 返回码
 msg: 返回信息
-data.money
-data.order.id
-data.order.order_id
-data.order.project
+data.money: 购买金额
+data.order.id: （数据库中的key字段，整型，非uuid）
+data.order.order_id: uuid
+data.order.namespace
 data.order.region
 data.order.quantities
 data.order.plan_id
@@ -92,7 +92,7 @@ code: 返回码
 msg: 返回信息
 data.id
 data.order_id
-data.project
+data.namespace
 data.region
 data.quantities
 data.plan_id
