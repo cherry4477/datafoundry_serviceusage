@@ -622,9 +622,9 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	type NamedOrder struct {
 		Order *usage.PurchaseOrder `json:"order,omitempty"`
 	}
-	result := make([]*NamedOrder, len(orders))
+	result := make([]NamedOrder, len(orders))
 	for i, o := range orders {
-		result[i] = &NamedOrder{o}
+		result[i].Order = o
 	}
 
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, result))
