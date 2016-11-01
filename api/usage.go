@@ -306,9 +306,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		//}
 	}
 
-	// drytry=1: don't create order actually
-	drytry := r.FormValue("drytry") == "1"
-
 	// create new order (in pending status)
 
 	now := time.Now()
@@ -332,6 +329,9 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 		Creator: creator,
 	}
+
+	// drytry=1: don't create order actually
+	drytry := r.FormValue("drytry") == "1"
 
 	if !drytry {
 		order.Id, err = usage.CreateOrder(db, order)
@@ -524,7 +524,15 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	JsonResult(w, http.StatusOK, nil, order)
+	// ...
+
+	result := struct {
+		Order *usage.PurchaseOrder `json:"order,omitempty"`
+	}{
+		order,
+	}
+
+	JsonResult(w, http.StatusOK, nil, result)
 }
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -609,7 +617,17 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		o.StatusLabel = orderStatusToLabel(o.Status)
 	}
 
-	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, orders))
+	// ...
+
+	type NamedOrder struct {
+		Order *usage.PurchaseOrder `json:"order,omitempty"`
+	}
+	result := make([]*NamedOrder, len(orders))
+	for i, o := range orders {
+		result[i] = &NamedOrder{o}
+	}
+
+	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, result))
 }
 
 //==================================================================
