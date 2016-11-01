@@ -92,9 +92,11 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 			remaingMoney = 0.0
 
 			// try to end last order 
-			err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
-			if err != nil {
-				return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+			if ! drytry {
+				err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
+				if err != nil {
+					return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+				}
 			}
 
 			// create new 
@@ -127,9 +129,11 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 		}
 
 		// try to end last order 
-		err := usage.EndOrder(db, oldOrder, now, lastConsume, remaingMoney)
-		if err != nil {
-			return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+		if ! drytry {
+			err := usage.EndOrder(db, oldOrder, now, lastConsume, remaingMoney)
+			if err != nil {
+				return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+			}
 		}
 	}
 

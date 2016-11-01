@@ -290,10 +290,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if there is an old order
 
-
-
-fmt.Println("aaa orderId =", orderId, ", plan.Region=", plan.Region)
-
 	oldOrder, err := usage.RetrieveOrderByID(db, orderId, plan.Region, usage.OrderStatus_Consuming)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
@@ -356,8 +352,6 @@ fmt.Println("aaa orderId =", orderId, ", plan.Region=", plan.Region)
 		JsonResult(w, http.StatusBadRequest, GetError2(errCode, err.Error()), nil)
 		return
 	}
-
-fmt.Println("zzz paymentMoney =", paymentMoney, ", oldOrder=", oldOrder)
 
 	// ...
 
