@@ -90,16 +90,16 @@ Return Result (json):
 ```
 code: 返回码
 msg: 返回信息
-data.id
-data.order_id
-data.namespace
-data.region
-data.quantities
-data.plan_id
-data.start_time
-data.end_time: 只有订单已经被终止的时候存在
-data.status: "pending" | "consuming" | "ended"
-data.creator
+data.order.id
+data.order.order_id
+data.order.namespace
+data.order.region
+data.order.quantities
+data.order.plan_id
+data.order.start_time
+data.order.end_time: 只有订单已经被终止的时候存在
+data.order.status: "pending" | "consuming" | "ended"
+data.order.creator
 ```
 
 ### GET /usageapi/v1/orders?namespace={namespace}&status={status}&region={region}&page={page}&size={size}
@@ -121,16 +121,17 @@ code: 返回码
 msg: 返回信息
 data.total
 data.results
-data.results[0].id
-data.results[0].order_id
-data.results[0].namespace
-data.results[0].region
-data.results[0].quantities
-data.results[0].plan_id
-data.results[0].start_time
-data.results[0].end_time: 只有订单已经被终止的时候存在
-data.results[0].status: "consuming" | "ended"
-data.results[0].creator
+data.results[0].order
+data.results[0].order.id
+data.results[0].order.order_id
+data.results[0].order.namespace
+data.results[0].order.region
+data.results[0].order.quantities
+data.results[0].order.plan_id
+data.results[0].order.start_time
+data.results[0].order.end_time: 只有订单已经被终止的时候存在
+data.results[0].order.status: "consuming" | "ended"
+data.results[0].order.creator
 ...
 
 ```
