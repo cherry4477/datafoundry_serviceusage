@@ -359,7 +359,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		Money string               `json:"money,omitempty"`
 		Order *usage.PurchaseOrder `json:"order,omitempty"`
 	}{
-		fmt.Sprint("%.2f", paymentMoney),
+		fmt.Sprintf("%.2f", paymentMoney),
 		order,
 	}
 
@@ -537,8 +537,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
-fmt.Println("aaa:", time.Now())
-
 	// auth
 
 	username, e := validateAuth(r.Header.Get("Authorization"))
@@ -546,7 +544,6 @@ fmt.Println("aaa:", time.Now())
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
-fmt.Println("bbb:", time.Now())
 
 	accountId := r.FormValue("namespace")
 	if accountId == "" {
@@ -558,7 +555,6 @@ fmt.Println("bbb:", time.Now())
 			return
 		}
 	}
-fmt.Println("ccc:", time.Now())
 
 	// check if user can manipulate project or not
 	if accountId != username {
@@ -568,7 +564,6 @@ fmt.Println("ccc:", time.Now())
 			return
 		}
 	}
-fmt.Println("ddd:", time.Now())
 
 	// ...
 
@@ -584,7 +579,6 @@ fmt.Println("ddd:", time.Now())
 			return
 		}
 	}
-fmt.Println("eee:", time.Now())
 
 	renewalFailedOnly := statusLabel == OrderStatusLabel_RenewalFailed
 
@@ -598,7 +592,6 @@ fmt.Println("eee:", time.Now())
 			return
 		}
 	}
-fmt.Println("fff:", time.Now())
 
 	// ...
 	
@@ -606,15 +599,11 @@ fmt.Println("fff:", time.Now())
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-fmt.Println("ggg:", time.Now())
-
 	count, orders, err := usage.QueryOrders(db, accountId, region, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
 	}
-
-fmt.Println("zzz:", time.Now())
 
 	for _, o := range orders {
 		o.StatusLabel = orderStatusToLabel(o.Status)
