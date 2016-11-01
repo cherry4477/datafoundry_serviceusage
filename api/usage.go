@@ -531,14 +531,13 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	// ...
 
-fmt.Println("000:", time.Now())
 	db := getDB()
 	if db == nil {
 		JsonResult(w, http.StatusInternalServerError, GetError(ErrorCodeDbNotInitlized), nil)
 		return
 	}
 
-fmt.Println("111:", time.Now())
+fmt.Println("aaa:", time.Now())
 
 	// auth
 
@@ -547,6 +546,7 @@ fmt.Println("111:", time.Now())
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
+fmt.Println("bbb:", time.Now())
 
 	accountId := r.FormValue("namespace")
 	if accountId == "" {
@@ -558,6 +558,7 @@ fmt.Println("111:", time.Now())
 			return
 		}
 	}
+fmt.Println("ccc:", time.Now())
 
 	// check if user can manipulate project or not
 	if accountId != username {
@@ -567,6 +568,7 @@ fmt.Println("111:", time.Now())
 			return
 		}
 	}
+fmt.Println("ddd:", time.Now())
 
 	// ...
 
@@ -582,6 +584,7 @@ fmt.Println("111:", time.Now())
 			return
 		}
 	}
+fmt.Println("eee:", time.Now())
 
 	renewalFailedOnly := statusLabel == OrderStatusLabel_RenewalFailed
 
@@ -595,6 +598,7 @@ fmt.Println("111:", time.Now())
 			return
 		}
 	}
+fmt.Println("fff:", time.Now())
 
 	// ...
 	
@@ -602,7 +606,7 @@ fmt.Println("111:", time.Now())
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-fmt.Println("222:", time.Now())
+fmt.Println("ggg:", time.Now())
 
 	count, orders, err := usage.QueryOrders(db, accountId, region, status, renewalFailedOnly, offset, size)
 	if err != nil {
@@ -610,7 +614,7 @@ fmt.Println("222:", time.Now())
 		return
 	}
 
-fmt.Println("333:", time.Now())
+fmt.Println("zzz:", time.Now())
 
 	for _, o := range orders {
 		o.StatusLabel = orderStatusToLabel(o.Status)
