@@ -352,7 +352,7 @@ func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	
 	var index int
 
-	index = strings.Index(plan.Specification1, " CPU Cores")
+	index = strings.Index(plan.Specification1, " CPU Core")
 	if index < 0 {
 		return 0, 0, fmt.Errorf("invalid cpu format: %s", plan.Specification1)
 	}
