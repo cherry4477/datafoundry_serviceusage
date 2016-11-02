@@ -171,7 +171,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 		return err
 	}
 
-	const Mi = int64(1) << 30
+	const Mi = int64(1) << 20
 	const Gi = int64(1) << 30
 
 	cpuQuantity := *kapiresource.NewQuantity(int64(cpus), kapiresource.DecimalSI)
@@ -188,7 +188,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 
 	namespaceUri := "/namespaces/" + project
 
-	// the new implementation: check existance, create on not found, update on found
+	// the new implementation: check existance, create on not found, update on found. 
 
 	// set quotas
 	{
