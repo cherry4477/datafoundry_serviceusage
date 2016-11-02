@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 	"strings"
-	"errors"
+	//"errors"
 	"strconv"
 
 	"github.com/asiainfoLDP/datahub_commons/common"
@@ -160,6 +160,7 @@ const (
 )
 
 const ProjectCpuMemoryQuotaName = "standard-quota"
+const ProjectCpuMemoryLimitsName = "standard-limits"
 
 func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 
@@ -170,82 +171,148 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 		return err
 	}
 
+	const Mi = int64(1) << 30
 	const Gi = int64(1) << 30
-	cpuQuantity := *kapiresource.NewQuantity(int64(cpus), kapiresource.DecimalExponent)
+
+	cpuQuantity := *kapiresource.NewQuantity(int64(cpus), kapiresource.DecimalSI)
 	memQuantity := *kapiresource.NewQuantity(int64(mems)*Gi, kapiresource.BinarySI)
 
-	quota := kapi.ResourceQuota {}
-	quota.Kind = "ResourceQuota"
-	quota.APIVersion = "v1"
-	quota.Name = ProjectCpuMemoryQuotaName
-	quota.Spec.Hard = kapi.ResourceList {
-		ResourceLimitsCPU:      cpuQuantity,
-		ResourceLimitsMemory:   memQuantity,
-		ResourceRequestsCPU:    cpuQuantity,
-		ResourceRequestsMemory: memQuantity,
-	}
-	
-	// ...
-	
-	uri := "/namespaces/" + project + "/resourcequotas"
+	cpuQuantity_PodMin := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
+	memQuantity_PodMin := *kapiresource.NewQuantity(6*Mi, kapiresource.BinarySI)
 
-	osRest := openshift.NewOpenshiftREST(nil)
+	cpuQuantity_ContainerMin := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
+	memQuantity_ContainerMin := *kapiresource.NewQuantity(4*Mi, kapiresource.BinarySI)
 
-	// the old implementation: delete all then create new one
-	/*
-	// delete all quotas
+	cpuQuantity_ContainerDefault := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
+	memQuantity_ContainerDefault := *kapiresource.NewQuantity(500*Mi, kapiresource.BinarySI)
 
-	osRest.KDelete(uri, nil)
-	if osRest.Err != nil {
-		Logger.Warningf("delete quota (%s) error: %s", uri, osRest.Err)
-
-		return osRest.Err
-	}
-
-	// create new one
-
-	osRest.KPost(uri, &quota, nil)
-	if osRest.Err != nil {
-		Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
-
-		return osRest.Err
-	}
-	*/
+	namespaceUri := "/namespaces/" + project
 
 	// the new implementation: check existance, create on not found, update on found
 
-	fullUri := uri + "/" + ProjectCpuMemoryQuotaName
+	// set quotas
+	{
+		uri := namespaceUri + "/resourcequotas"
+		fullUri := namespaceUri + "/resourcequotas/" + ProjectCpuMemoryQuotaName
 
-	oldQuota := kapi.ResourceQuota {}
-	osRest.KGet(fullUri, &oldQuota)
-	if osRest.Err != nil {
-		if osRest.StatusCode != 404 {
-			Logger.Warningf("get quota (%s) error: %s", fullUri, osRest.Err)
-
-			return osRest.Err
+		quota := kapi.ResourceQuota {}
+		quota.Kind = "ResourceQuota"
+		quota.APIVersion = "v1"
+		quota.Name = ProjectCpuMemoryQuotaName
+		quota.Spec.Hard = kapi.ResourceList {
+			ResourceLimitsCPU:      cpuQuantity,
+			ResourceLimitsMemory:   memQuantity,
+			ResourceRequestsCPU:    cpuQuantity,
+			ResourceRequestsMemory: memQuantity,
 		}
 
-		// create new
-		osRest = openshift.NewOpenshiftREST(nil)
-		osRest.KPost(uri, &quota, nil) 
+		osRest := openshift.NewOpenshiftREST(nil)
+
+		oldQuota := kapi.ResourceQuota {}
+		osRest.KGet(fullUri, &oldQuota)
 		if osRest.Err != nil {
-			Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
+			if osRest.StatusCode != 404 {
+				Logger.Warningf("get quota (%s) error: %s", fullUri, osRest.Err)
 
-			return osRest.Err
-		}
-	} else {
-		// todo: if old and new are equal, do nothing
+				return osRest.Err
+			}
 
-		// update quota
-		osRest = openshift.NewOpenshiftREST(nil)
-		osRest.KPut(fullUri, &quota, nil)
-		if osRest.Err != nil {
-			Logger.Warningf("update quota (%s) error: %s", fullUri, osRest.Err)
+			// create new
+			osRest = openshift.NewOpenshiftREST(nil)
+			osRest.KPost(uri, &quota, nil) 
+			if osRest.Err != nil {
+				Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
 
-			return osRest.Err
+				return osRest.Err
+			}
+		} else {
+			// todo: if old and new are equal, do nothing
+
+			// update quota
+			osRest = openshift.NewOpenshiftREST(nil)
+			osRest.KPut(fullUri, &quota, nil)
+			if osRest.Err != nil {
+				Logger.Warningf("update quota (%s) error: %s", fullUri, osRest.Err)
+
+				return osRest.Err
+			}
 		}
 	}
-	 
+
+	// set limit
+	{
+		uri := namespaceUri + "/limitranges"
+		fullUri := namespaceUri + "/limitranges/" + ProjectCpuMemoryLimitsName
+
+		limit := kapi.LimitRange {}
+		limit.Kind = "LimitRange"
+		limit.APIVersion = "v1"
+		limit.Name = ProjectCpuMemoryLimitsName
+		limit.Spec.Limits = []kapi.LimitRangeItem {
+			{
+				Type: kapi.LimitTypePod,
+				Max: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity,
+						kapi.ResourceMemory: memQuantity,
+					},
+				Min: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity_PodMin,
+						kapi.ResourceMemory: memQuantity_PodMin,
+					},
+			},
+			{
+				Type: kapi.LimitTypeContainer,
+				Max: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity,
+						kapi.ResourceMemory: memQuantity,
+					},
+				Min: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity_ContainerMin,
+						kapi.ResourceMemory: memQuantity_ContainerMin,
+					},
+				Default: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity_ContainerDefault,
+						kapi.ResourceMemory: memQuantity_ContainerDefault,
+					},
+				DefaultRequest: kapi.ResourceList{
+						kapi.ResourceCPU:    cpuQuantity_ContainerDefault,
+						kapi.ResourceMemory: memQuantity_ContainerDefault,
+					},
+			},
+		}
+
+		osRest := openshift.NewOpenshiftREST(nil)
+
+		oldLimit := kapi.LimitRange {}
+		osRest.KGet(fullUri, &oldLimit)
+		if osRest.Err != nil {
+			if osRest.StatusCode != 404 {
+				Logger.Warningf("get limit (%s) error: %s", fullUri, osRest.Err)
+
+				return osRest.Err
+			}
+
+			// create new
+			osRest = openshift.NewOpenshiftREST(nil)
+			osRest.KPost(uri, &limit, nil) 
+			if osRest.Err != nil {
+				Logger.Warningf("create limit (%s) error: %s", uri, osRest.Err)
+
+				return osRest.Err
+			}
+		} else {
+			// todo: if old and new are equal, do nothing
+
+			// update limit
+			osRest = openshift.NewOpenshiftREST(nil)
+			osRest.KPut(fullUri, &limit, nil)
+			if osRest.Err != nil {
+				Logger.Warningf("update limit (%s) error: %s", fullUri, osRest.Err)
+
+				return osRest.Err
+			}
+		}
+	}
 
 	return nil
 }
@@ -280,27 +347,27 @@ func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	//"specification2": "32 GB RAM"，
 
 	if plan.Plan_type != PLanType_Quota {
-		return 0, 0, errors.New("not a quota plan")
+		return 0, 0, fmt.Errorf("not a quota plan: %s", plan.Plan_type)
 	}
 	
 	var index int
 
 	index = strings.Index(plan.Specification1, " CPU Cores")
 	if index < 0 {
-		return 0, 0, errors.New("invalid cpu format")
+		return 0, 0, fmt.Errorf("invalid cpu format: %s", plan.Specification1)
 	}
 	cpus, err := strconv.Atoi(plan.Specification1[:index])
 	if err != nil || cpus < 0 {
-		return 0, 0, errors.New("invalid cpu format.")
+		return 0, 0, fmt.Errorf("invalid cpu format: %s", plan.Specification1)
 	}
 	
 	index = strings.Index(plan.Specification2, " GB RAM")
 	if index < 0 {
-		return 0, 0, errors.New("invalid memory format")
+		return 0, 0, fmt.Errorf("invalid memory format: %s", plan.Specification2)
 	}
 	mems, err := strconv.Atoi(plan.Specification2[:index])
 	if err != nil || mems < 0 {
-		return 0, 0, errors.New("invalid memory format.")
+		return 0, 0, fmt.Errorf("invalid memory format: %s", plan.Specification2)
 	}
 
 	return cpus, mems, nil
