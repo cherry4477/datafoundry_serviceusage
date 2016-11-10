@@ -6,7 +6,7 @@ import (
 	"math"
 	"database/sql"
 
-	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
+	//"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
 )
@@ -157,7 +157,8 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	if paymentMoney > 0.0 {
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
 
-		err, insufficientBalance := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason, order.Region)
+		//err, insufficientBalance := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason, order.Region)
+		err, insufficientBalance := makePayment(accountId, paymentMoney, paymentReason, order.Region)
 		if err != nil && insufficientBalance {
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {

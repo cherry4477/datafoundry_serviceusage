@@ -24,31 +24,47 @@ import (
 // remote end point
 //======================================================
 
+const (
+	DfRegion_CnNorth01 = "cn-north-1"
+	DfRegion_CnNorth02 = "cn-north-2"
+
+	NumDfRegions = 2
+
+	DfRegion_Default = DfRegion_CnNorth01
+)
+
 var (
-	DataFoundryHost string
+	//DataFoundryHost string
+	osClients map[string]*openshift.OpenshiftClient // region -> client
 
 	PaymentService  string
 	PlanService     string
 	RechargeSercice string
 )
 
-func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string, portEnv string) string {
-	addr := os.Getenv(addrEnv)
-	if addr == "" {
-		Logger.Fatalf("%s env should not be null", addrEnv)
+func BuildDataFoundryClient(infoEnv string, durPhase time.Duration) *openshift.OpenshiftClient {
+	info := os.Getenv(infoEnv)
+	params := strings.Split(strings.TrimSpace(info), " ")
+	if len(params) != 3 {
+		Logger.Fatal("BuildDataFoundryClient, len(params) is not correct: ", len(params))
 	}
-	if portEnv != "" {
-		port := os.Getenv(portEnv)
-		if port != "" {
-			addr += ":" + port
-		}
+
+	return openshift.CreateOpenshiftClient(infoEnv, params[0], params[1], params[2], durPhase)
+}
+
+func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, address string, port string) string {
+	if address == "" {
+		Logger.Fatalf("%s: address should not be null", name)
+	}
+	if port != "" {
+		address += ":" + port
 	}
 
 	prefix := ""
 	if isHttps {
-		prefix = fmt.Sprintf("https://%s", addr)
+		prefix = fmt.Sprintf("https://%s", address)
 	} else {
-		prefix = fmt.Sprintf("http://%s", addr)
+		prefix = fmt.Sprintf("http://%s", address)
 	}
 
 	Logger.Infof("%s = %s", name, prefix)
@@ -56,21 +72,28 @@ func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, addrEnv string, por
 	return prefix
 }
 
-
 func initGateWay() {
-	DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, "DATAFOUNDRY_HOST_ADDR", "")
-	openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
+	//DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, os.Getenv("DATAFOUNDRY_HOST_ADDR"), "")
+	//openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
+	var durPhase time.Duration
+	phaseSetp := time.Hour / NumDfRegions
 
-	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT"))
-	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT"))
-	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST"), os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT"))
+	osClients = make(map[string]*openshift.OpenshiftClient, NumDfRegions)
+	osClients[DfRegion_CnNorth01] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_1", durPhase)
+	durPhase += phaseSetp
+	osClients[DfRegion_CnNorth02] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_2", durPhase)
+	durPhase += phaseSetp
+
+	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT")))
+	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT")))
+	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT")))
 }
 
 //================================================================
 // 
 //================================================================
 
-func authDF(userToken string) (*userapi.User, error) {
+func authDF(region, userToken string) (*userapi.User, error) {
 	if Debug {
 		return &userapi.User{
 			ObjectMeta: kapi.ObjectMeta {
@@ -80,7 +103,14 @@ func authDF(userToken string) (*userapi.User, error) {
 	}
 
 	u := &userapi.User{}
-	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	oc := osClients[region]
+	if oc == nil {
+		return nil, fmt.Errorf("open shift client not found for region: %s")
+	}
+	oc = oc.NewOpenshiftClient(userToken)
+	osRest := openshift.NewOpenshiftREST(oc)
+
 	uri := "/users/~"
 	osRest.OGet(uri, u)
 	if osRest.Err != nil {
@@ -95,13 +125,13 @@ func dfUser(user *userapi.User) string {
 	return user.Name
 }
 
-func getDFUserame(token string) (string, error) {
+func getDFUserame(region, token string) (string, error) {
 	//Logger.Info("token = ", token)
 	//if Debug {
 	//	return "liuxu", nil
 	//}
 
-	user, err := authDF(token)
+	user, err := authDF(region, token)
 	if err != nil {
 		return "", err
 	}
@@ -112,9 +142,17 @@ func getDFUserame(token string) (string, error) {
 // 
 //=======================================================================
 
-func getDfProject(usernameForLog, userToken, project string) (*projectapi.Project, error) {
+func getDfProject(region, usernameForLog, userToken, project string) (*projectapi.Project, error) {
 	p := &projectapi.Project{}
-	osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	
+	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
+	oc := osClients[region]
+	if oc == nil {
+		return nil, fmt.Errorf("open shift client not found for region: %s", region)
+	}
+	oc = oc.NewOpenshiftClient(userToken)
+	osRest := openshift.NewOpenshiftREST(oc)
+
 	uri := "/projects/"+project
 	osRest.OGet(uri, p)
 	if osRest.Err != nil {
@@ -427,10 +465,17 @@ func getPlanByID(planId string) (*Plan, error) {
 const ErrorCodeUpdateBalance = 1309
 
 // the return bool means insufficient balance or not
-func makePayment(adminToken, accountId string, money float32, reason, region string) (error, bool) {
+//func makePayment(adminToken, accountId string, money float32, reason, region string) (error, bool) {
+func makePayment(accountId string, money float32, reason, region string) (error, bool) {
 	if Debug {
 		return nil, false
 	}
+
+	oc := osClients[region]
+	if oc == nil {
+		return fmt.Errorf("open shift client not found for region: %s", region), false
+	}
+	adminToken := oc.BearerToken()
 
 	body := fmt.Sprintf(
 		`{"namespace":"%s","amount":%.3f,"reason":"%s", "region":"%s"}`, 

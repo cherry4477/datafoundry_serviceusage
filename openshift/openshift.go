@@ -31,54 +31,23 @@ import (
 	//"github.com/ghodss/yaml"
 )
 
-func Init(dfHost, adminUser, adminPass string) {
-	theOC = createOpenshiftClient(dfHost, adminUser, adminPass)
-}
+//func Init(dfHost, adminUser, adminPass string) {
+//	theOC = createOpenshiftClient(dfHost, adminUser, adminPass)
+//}
 
 //==============================================================
 //
 //==============================================================
 
-var theOC *OpenshiftClient // with admin token
+//var theOC *OpenshiftClient // with admin token
 
-func adminClient() *OpenshiftClient {
-	return theOC
-}
+//func adminClient() *OpenshiftClient {
+//	return theOC
+//}
 
-func AdminToken() string {
-	return theOC.BearerToken()
-}
-
-//==============================================================
-//
-//==============================================================
-
-// for general user
-// the token must contains "Bearer "
-func NewOpenshiftClient(token string) *OpenshiftClient {
-	oc := &OpenshiftClient{
-		host:    theOC.host,
-		oapiUrl: theOC.oapiUrl,
-		kapiUrl: theOC.kapiUrl,
-	}
-
-	oc.setBearerToken(token)
-
-	return oc
-}
-
-type OpenshiftClient struct {
-	host string
-	//authUrl string
-	oapiUrl string
-	kapiUrl string
-
-	namespace   string
-	username    string
-	password    string
-	//bearerToken string
-	bearerToken atomic.Value
-}
+//func AdminToken() string {
+//	return theOC.BearerToken()
+//}
 
 func httpsAddrMaker(addr string) string {
 	if strings.HasSuffix(addr, "/") {
@@ -92,10 +61,15 @@ func httpsAddrMaker(addr string) string {
 	return addr
 }
 
-// for admin
-func createOpenshiftClient(host, username, password string) *OpenshiftClient {
+//==============================================================
+//
+//==============================================================
+
+func CreateOpenshiftClient(name, host, username, password string, durPhase time.Duration) *OpenshiftClient {
 	host = httpsAddrMaker(host)
 	oc := &OpenshiftClient{
+		name: name,
+
 		host: host,
 		//authUrl: host + "/oauth/authorize?response_type=token&client_id=openshift-challenging-client",
 		oapiUrl: host + "/oapi/v1",
@@ -106,7 +80,36 @@ func createOpenshiftClient(host, username, password string) *OpenshiftClient {
 	}
 	oc.bearerToken.Store("")
 	
-	go oc.updateBearerToken()
+	go oc.updateBearerToken(durPhase)
+
+	return oc
+}
+
+type OpenshiftClient struct {
+	name string
+
+	host string
+	//authUrl string
+	oapiUrl string
+	kapiUrl string
+
+	namespace   string
+	username    string
+	password    string
+	//bearerToken string
+	bearerToken atomic.Value
+}
+
+// for general user
+// the token must contains "Bearer "
+func (baseOC *OpenshiftClient) NewOpenshiftClient(token string) *OpenshiftClient {
+	oc := &OpenshiftClient{
+		host:    baseOC.host,
+		oapiUrl: baseOC.oapiUrl,
+		kapiUrl: baseOC.kapiUrl,
+	}
+
+	oc.setBearerToken(token)
 
 	return oc
 }
@@ -120,7 +123,7 @@ func (oc *OpenshiftClient) setBearerToken(token string) {
 	oc.bearerToken.Store(token)
 }
 
-func (oc *OpenshiftClient) updateBearerToken() {
+func (oc *OpenshiftClient) updateBearerToken(durPhase time.Duration) {
 	for {
 		clientConfig := &kclient.Config{}
 		clientConfig.Host = oc.host
@@ -139,9 +142,11 @@ func (oc *OpenshiftClient) updateBearerToken() {
 			//oc.bearerToken = "Bearer " + token
 			oc.setBearerToken("Bearer " + token)
 
-			println("RequestToken token: ", token)
+			println(oc.name, ", RequestToken token: ", token)
 
-			time.Sleep(3 * time.Hour)
+			// durPhase is to avoid mulitple OCs updating tokens at the same time
+			time.Sleep(3 * time.Hour + durPhase)
+			durPhase = 0
 		}
 	}
 }
@@ -261,14 +266,10 @@ type OpenshiftREST struct {
 	StatusCode int
 }
 
-//func NewOpenshiftREST(oc *OpenshiftClient) *OpenshiftREST {
-//	return &OpenshiftREST{oc: oc}
-//}
-
 func NewOpenshiftREST(client *OpenshiftClient) *OpenshiftREST {
-	if client == nil {
-		return &OpenshiftREST{oc: adminClient()}
-	}
+	//if client == nil {
+	//	return &OpenshiftREST{oc: adminClient()}
+	//}
 	return &OpenshiftREST{oc: client}
 }
 

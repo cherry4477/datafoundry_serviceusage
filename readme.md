@@ -110,7 +110,7 @@ Query Parameters:
 ```
 namespace: 可省略，默认为当前用户名称。
 status: 订单状态。"consuming" | "ended" | "renewalfailed"。可以缺省，表示consuming。
-region: 区标识。
+region: 区标识，不可缺省。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
@@ -144,7 +144,7 @@ Query Parameters:
 ```
 namespace: 可省略，默认为当前用户名称。
 order: 订单号。可省略，表示namespace内的所有订单。
-region: 区标识。
+region: 区标识，不可缺省。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
@@ -232,11 +232,30 @@ oc new-app --name datafoundryserviceusage https://github.com/asiainfoLDP/datafou
     -e  ENV_NAME_MYSQL_USER="BSI_MYSQL_MYSQLFORSERVICEUSAGE_USERNAME" \
     -e  ENV_NAME_MYSQL_PASSWORD="BSI_MYSQL_MYSQLFORSERVICEUSAGE_PASSWORD"
 
+
+
 ```
-以下3个环境变量可以留空：
+以下3个环境变量已废止：
+    -e  DATAFOUNDRY_HOST_ADDR="xxx" \
+    -e  DATAFOUNDRY_ADMIN_USER="xxx" \
+    -e  DATAFOUNDRY_ADMIN_PASS="xxx" \
+使用以下取而代之：
+    -e  DATAFOUNDRY_INFO_CN_NORTH_1="addr user pass" \
+    -e  DATAFOUNDRY_INFO_CN_NORTH_2="addr user pass" \
+```
+
+```
+以下3个环境变量已废止：
     PAYMENT_SERVICE_API_SERVER="xxx" 
     PLAN_SERVICE_API_SERVER="xxx" 
     RECHARGE_SERVICE_API_SERVER="xxx" 
+使用以下6个取而代之：
+    ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST="DATAFOUNDRYPAYMENT_SERVICE_HOST"
+    ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT="DATAFOUNDRYPAYMENT_SERVICE_PORT"
+    ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST="DATAFOUNDRYPLAN_SERVICE_HOST"
+    ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT="DATAFOUNDRYPLAN_SERVICE_PORT"
+    ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST="DATAFOUNDRYRECHARGE_SERVICE_HOST"
+    ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT="DATAFOUNDRYRECHARGE_SERVICE_PORT_8090_TCP"
 ```
 
 oc bind MysqlForServiceUsage datafoundryserviceusage

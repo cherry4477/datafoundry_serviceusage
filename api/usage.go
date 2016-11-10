@@ -174,12 +174,12 @@ func orderStatusToLabel(status int) string {
 
 // ...
 
-func validateAuth(token string) (string, *Error) {
+func validateAuth(region, token string) (string, *Error) {
 	if token == "" {
 		return "", GetError(ErrorCodeAuthFailed)
 	}
 
-	username, err := getDFUserame(token)
+	username, err := getDFUserame(region, token)
 	if err != nil {
 		return "", GetError2(ErrorCodeAuthFailed, err.Error())
 	}
@@ -211,14 +211,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
 	//if !canManagePurchaseOrders(username) {
 	//	JsonResult(w, http.StatusForbidden, GetError(ErrorCodePermissionDenied), nil)
 	//	return
@@ -230,6 +222,34 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	err := common.ParseRequestJsonInto(r, orderCreation)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeParseJsonFailed, err.Error()), nil)
+		return
+	}
+
+	// ...
+
+	planId, e := validatePlanID(orderCreation.PlanID)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
+	plan, err := getPlanByID(planId)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error()), nil)
+		return
+	}
+
+	// assert planId == plan.Plan_id 
+	planType := plan.Plan_type
+	planRegion := plan.Region
+
+	// ...
+
+	// auth
+
+	username, e := validateAuth(planRegion, r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
 
@@ -246,7 +266,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err = getDfProject(username, r.Header.Get("Authorization"), accountId)
+		_, err = getDfProject(planRegion, username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -266,23 +286,6 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 	*/
 	creator := username
-
-	planId, e := validatePlanID(orderCreation.PlanID)
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	// ...
-	plan, err := getPlanByID(planId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error()), nil)
-		return
-	}
-
-	// assert planId == plan.Plan_id 
-	planType := plan.Plan_type
-	planRegion := plan.Region
 
 	// ...
 
@@ -381,19 +384,6 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
-	//if !canManagePurchaseOrders(username) {
-	//	JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
-	//	return
-	//}
-
 	// ...
 
 	//orderId, e := validateOrderID(params.ByName("order_id"))
@@ -414,6 +404,32 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 
+	// only orders in consuming status can be modified now.
+	// there should be most one consuming order for a orderId.
+	//oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
+	oldOrder, err := usage.RetrieveOrderByStatusAndAutoGenID(db, id, usage.OrderStatus_Consuming)
+	if err != nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
+		return
+	}
+	if oldOrder == nil {
+		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, "not found"), nil)
+		return
+	}
+
+	// auth
+
+	username, e := validateAuth(oldOrder.Region, r.Header.Get("Authorization"))
+	if e != nil {
+		JsonResult(w, http.StatusUnauthorized, e, nil)
+		return
+	}
+
+	//if !canManagePurchaseOrders(username) {
+	//	JsonResult(w, http.StatusUnauthorized, GetError(ErrorCodePermissionDenied), nil)
+	//	return
+	//}
+
 	accountId := orderMod.AccountID
 	if accountId == "" {
 		accountId = username
@@ -427,20 +443,11 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err = getDfProject(username, r.Header.Get("Authorization"), accountId)
+		_, err = getDfProject(oldOrder.Region, username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
 		}
-	}
-
-	// only orders in consuming status can be modified now.
-	// there should be most one consuming order for a orderId.
-	//oldOrder, err := usage.RetrieveOrderByID(db, orderId, usage.OrderStatus_Consuming)
-	oldOrder, err := usage.RetrieveOrderByStatusAndAutoGenID(db, id, usage.OrderStatus_Consuming)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
-		return
 	}
 
 	switch orderMod.Action {
@@ -482,27 +489,6 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 		return
 	}
 
-	// auth
-
-	username, e := validateAuth(r.Header.Get("Authorization"))
-	if e != nil {
-		JsonResult(w, http.StatusUnauthorized, e, nil)
-		return
-	}
-
-	accountId, e := validateAccountID(r.FormValue("namespace"))
-	if e != nil {
-		JsonResult(w, http.StatusBadRequest, e, nil)
-		return
-	}
-
-	// check if user can manipulate project or not
-	_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
-	if err != nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
-		return
-	}
-
 	// ...
 
 	//orderId, e := validateOrderID(params.ByName("order_id"))
@@ -522,6 +508,36 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, err.Error()), nil)
 		return
+	}
+	
+	if order != nil {
+		// auth
+
+		username, e := validateAuth(order.Region, r.Header.Get("Authorization"))
+		if e != nil {
+			JsonResult(w, http.StatusUnauthorized, e, nil)
+			return
+		}
+
+		accountId := r.FormValue("namespace")
+		if accountId == "" {
+			accountId = username
+		} else {
+			accountId, e = validateAccountID(accountId)
+			if e != nil {
+				JsonResult(w, http.StatusBadRequest, e, nil)
+				return
+			}
+		}
+		
+		if accountId != username {
+			// check if user can manipulate project or not
+			_, err := getDfProject(order.Region, username, r.Header.Get("Authorization"), accountId)
+			if err != nil {
+				JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
+				return
+			}
+		}
 	}
 
 	// ...
@@ -545,9 +561,27 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
+	// ...
+	/*
+	region := r.FormValue("region")
+	if region != "" {
+		region, e = validateRegion(region)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+	*/
+
+	region, e := validateRegion(r.FormValue("region"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
 	// auth
 
-	username, e := validateAuth(r.Header.Get("Authorization"))
+	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
@@ -566,7 +600,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
+		_, err := getDfProject(region, username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -589,17 +623,6 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	}
 
 	renewalFailedOnly := statusLabel == OrderStatusLabel_RenewalFailed
-
-	// ...
-
-	region := r.FormValue("region")
-	if region != "" {
-		region, e = validateRegion(region)
-		if e != nil {
-			JsonResult(w, http.StatusBadRequest, e, nil)
-			return
-		}
-	}
 
 	// ...
 	
@@ -661,9 +684,27 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
+	// ...
+	/*
+	region := r.FormValue("region")
+	if region != "" {
+		region, e = validateRegion(region)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+	*/
+
+	region, e := validateRegion(r.FormValue("region"))
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
 	// auth
 
-	username, e := validateAuth(r.Header.Get("Authorization"))
+	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
@@ -682,7 +723,7 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 
 	// check if user can manipulate project or not
 	if accountId != username {
-		_, err := getDfProject(username, r.Header.Get("Authorization"), accountId)
+		_, err := getDfProject(region, username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
@@ -694,17 +735,6 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 	orderId := r.FormValue("order")
 	if orderId != "" {
 		orderId, e = validateOrderID(orderId)
-		if e != nil {
-			JsonResult(w, http.StatusBadRequest, e, nil)
-			return
-		}
-	}
-
-	// ...
-
-	region := r.FormValue("region")
-	if region != "" {
-		region, e = validateRegion(region)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
