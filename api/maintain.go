@@ -32,6 +32,8 @@ func TryToRenewConsumingOrders() <- chan time.Time {
 
 	// todo:
 	// find all consuming orders which deadline < now()+7_days.
+	//now := time.Now()
+	//usage.
 
 	// ConsumeExtraInfo_RenewOrder
 
