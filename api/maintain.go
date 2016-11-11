@@ -48,7 +48,9 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 	// ...
 
-	numAll, orders, err := usage.QueryConsumingOrdersToRenew(db, 32)
+	const RenewMargin = 7 * 24 * time.Hour
+
+	numAll, orders, err := usage.QueryConsumingOrdersToRenew(db, RenewMargin, 32)
 	if err != nil {
 		Logger.Warningf("TryToRenewConsumingOrders at %s error: %s", time.Now().Format("2006-01-02 15:04:05.999999"), err.Error())
 	} else {
@@ -75,7 +77,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 		dur = time.Second
 		Logger.Debugf("TryToRenewConsumingOrders len(orders) == maxCount")
 	} else {
-		d, err := usage.GetDurationToRenewNextConsumingOrder(db)
+		d, err := usage.GetDurationToRenewNextConsumingOrder(db, RenewMargin)
 		if err != nil {
 			Logger.Warningf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
 		} else {

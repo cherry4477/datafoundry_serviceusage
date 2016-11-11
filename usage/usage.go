@@ -356,8 +356,64 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 }
 */
 
-func GetDurationToRenewNextConsumingOrder(db *sql.DB) (time.Duration, error) {
-	return time.Hour, nil
+// for maintaining
+func QueryConsumingOrdersToRenew(db DbOrTx, margin time.Duration, limit int) (int64, []*PurchaseOrder, error) {
+	var beforeTime = time.Now().Add(margin)
+
+	// ...
+
+	sqlWhere := fmt.Sprintf("STATUS=%d", OrderStatus_Consuming)
+
+	// filter out pending orders
+	sqlWhere = sqlWhere + " and EVER_PAYED=1"
+
+	//
+	sqlWhere = sqlWhere + fmt.Sprintf(" and DEADLINE_TIME<'%s'", beforeTime.Format("2006-01-02 15:04:05.999999"))
+
+	// ...
+
+	orderBy, sortOrder := "DEADLINE_TIME", SortOrder_Asc
+
+	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
+
+	// ...
+
+	return getOrderList(db, 0, limit, sqlWhere, sqlSort)
+}
+
+func GetDurationToRenewNextConsumingOrder(db *sql.DB, margin time.Duration) (time.Duration, error) {
+	sqlWhere := fmt.Sprintf("STATUS=%d", OrderStatus_Consuming)
+
+	// filter out pending orders
+	sqlWhere = sqlWhere + " and EVER_PAYED=1"
+
+	// ...
+	sqlWhere = sqlWhere + fmt.Sprintf(" and DEADLINE_TIME<'%s'", time.Now().Format("2006-01-02 15:04:05.999999"))
+
+	// ...
+
+	orderBy, sortOrder := "DEADLINE_TIME", SortOrder_Asc
+
+	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
+
+	// ...
+
+	_, orders, err := getOrderList(db, 0, 1, sqlWhere, sqlSort)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(orders) == 0 {
+		return time.Hour * 5, nil
+	}
+
+	order := orders[0]
+	d := order.Deadline_time.Sub(time.Now()) - margin
+	if d < 0 {
+		d = 0
+	}
+
+	return d, nil
 }
 
 func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDuration time.Duration) (*PurchaseOrder, error) {
@@ -601,25 +657,6 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	// ...
 
 	return getOrderList(db, offset, limit, sqlWhere, sqlSort, sqlParams...)
-}
-
-// for maintaining
-func QueryConsumingOrdersToRenew(db DbOrTx, limit int) (int64, []*PurchaseOrder, error) {
-
-	sqlWhere := fmt.Sprintf("STATUS=%d", OrderStatus_Consuming)
-
-	// filter out pending orders
-	sqlWhere = sqlWhere + " and EVER_PAYED=1"
-
-	// ...
-
-	orderBy, sortOrder := "DEADLINE_TIME", SortOrder_Asc
-
-	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
-
-	// ...
-
-	return getOrderList(db, 0, limit, sqlWhere, sqlSort)
 }
 
 //=======================================================================
