@@ -65,6 +65,19 @@ func httpsAddrMaker(addr string) string {
 //
 //==============================================================
 
+func CreateOpenshiftClientFromUserToken(host, token string) *OpenshiftClient {
+	host = httpsAddrMaker(host)
+	oc := &OpenshiftClient{
+		host: host,
+		oapiUrl: host + "/oapi/v1",
+		kapiUrl: host + "/api/v1",
+	}
+
+	oc.setBearerToken(token)
+
+	return oc
+}
+
 func CreateOpenshiftClient(name, host, username, password string, durPhase time.Duration) *OpenshiftClient {
 	host = httpsAddrMaker(host)
 	oc := &OpenshiftClient{

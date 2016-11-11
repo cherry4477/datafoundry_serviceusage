@@ -114,7 +114,8 @@ func authDF(region, userToken string) (*userapi.User, error) {
 	uri := "/users/~"
 	osRest.OGet(uri, u)
 	if osRest.Err != nil {
-		Logger.Infof("authDF, region(%s), token(%s), uri(%s) error: %s", region, userToken, uri, osRest.Err)
+		Logger.Infof("authDF, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+		//Logger.Infof("authDF, region(%s), token(%s), uri(%s) error: %s", region, userToken, uri, osRest.Err)
 		return nil, osRest.Err
 	}
 

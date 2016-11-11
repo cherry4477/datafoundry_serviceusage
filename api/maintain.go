@@ -18,28 +18,88 @@ import (
 func StartMaintaining() {
 	Logger.Infof("Maintaining service started.")
 
-	timerRenewOrders := time.After(time.Minute)
+	timerRenewConsumingOrders := time.After(time.Minute)
+	timerSendRenewWarnings    := time.After(5 * time.Minute)
 	
 	for {
 		select {
-		case <-timerRenewOrders:
-			timerRenewOrders = TryToRenewConsumingOrders()
+		case <-timerRenewConsumingOrders:
+			timerRenewConsumingOrders = TryToRenewConsumingOrders()
+		case <- timerSendRenewWarnings:
+			timerSendRenewWarnings = TryToSendRenewWarnings()
 		}
 	}
 }
 
-func TryToRenewConsumingOrders() <- chan time.Time {
+func TryToRenewConsumingOrders() (tm <- chan time.Time) {
+	/*
+	dur := 3 * time.Minute
+	defer func () {
+		tm = time.After(dur)
+	}()
+
+	// ...
+
+	db := getDB()
+	if db == nil {
+		Logger.Error("TryToRenewConsumingOrders error: db not inited")
+		return
+	}
+
+	// ...
+
+	cursor, err := usage.GetConsumingOrdersToRenew(db)
+	if err != nil {
+		Logger.Debugf("TryToRenewConsumingOrders at %s error: %s", time.Now().Format("2006-01-02 15:04:05.999999"), err.Error())
+	} else {
+		Logger.Debugf("TryToRenewConsumingOrders started at %s", time.Now().Format("2006-01-02 15:04:05.999999"))
+
+		defer cursor.Close()
+		for {
+			s, err := cursor.Next()
+			if err != nil {
+				Logger.Debugf("TryToRenewConsumingOrders cursor.Next error: %s", err.Error())
+			}
+			if s == nil {
+				break
+			}
+
+			err = subs.DenySubscriptionWithID(db, s.Subscription_id, "system: subscription applying denied for being expired")
+			if err != nil {
+				Logger.Warningf("TryToRenewConsumingOrders DeleteSubscription error: %s", err.Error())
+			} else {
+				Logger.Debugf("TryToRenewConsumingOrders done sub#%d", s.Subscription_id)
+				
+				s.Phase = subs.SubPhase_Denied
+				//subEventListener.Process(s)
+			}
+		}
+	}
+
+	d, err := subs.GetDurationToRenewNextConsumingOrder(db)
+	if err != nil {
+		Logger.Debugf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
+	} else {
+		dur = d
+	}
+	*/
+
+	return
+}
+
+func TryToSendRenewWarnings() (tm <- chan time.Time) {
+	/*
 
 	// todo:
 	// find all consuming orders which deadline < now()+7_days.
-	//now := time.Now()
-	//usage.
+	now := time.Now()
+	usage.
 
 	// ConsumeExtraInfo_RenewOrder
 
 	// if order is expired, change quota to 0
-
-	return time.After(time.Hour)
+*/
+	return
 }
 
 //======================================================
@@ -74,7 +134,6 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 
 	var consumExtraInfo int
 	var paymentMoney float32
-
 
 	if lastConsume == nil {
 
