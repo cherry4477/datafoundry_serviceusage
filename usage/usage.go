@@ -57,6 +57,17 @@ func orderPO2VO(order *PurchaseOrder) {
 //
 //=============================================================
 
+type DbOrTx interface {
+        Exec(query string, args ...interface{}) (sql.Result, error)
+        Prepare(query string) (*sql.Stmt, error)
+        Query(query string, args ...interface{}) (*sql.Rows, error)
+        QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+//=============================================================
+//
+//=============================================================
+
 // return the auto generated id
 func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 	// zongsan: now pending orders will be kept in db.
@@ -345,7 +356,11 @@ func RenewOrder(db *sql.DB, orderId string, extendedDuration time.Duration) (*Pu
 }
 */
 
-func RenewOrder(db *sql.DB, orderAutoGenId int64, extendedDuration time.Duration) (*PurchaseOrder, error) {
+func GetDurationToRenewNextConsumingOrder(db *sql.DB) (time.Duration, error) {
+	return time.Hour, nil
+}
+
+func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDuration time.Duration) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return nil, err
@@ -362,6 +377,11 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, extendedDuration time.Duration
 		if order == nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("order (id=%d) not found", orderAutoGenId)
+		}
+
+		if order.Last_consume_id != lastConsumeId { // already renewed?
+			tx.Rollback()
+			return order, nil
 		}
 
 		// need checking this? This function should be only called when a payment was just made.
@@ -517,7 +537,6 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
-	
 
 	sqlWhere := ""
 	if accountId != "" {
@@ -535,7 +554,6 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 			sqlWhere = sqlWhere + fmt.Sprintf(" and STATUS=%d", status)
 		}
 	}
-
 
 	if region != "" {
 		if sqlWhere == "" {
@@ -585,16 +603,28 @@ func QueryOrders(db DbOrTx, accountId string, region string, status int, renewal
 	return getOrderList(db, offset, limit, sqlWhere, sqlSort, sqlParams...)
 }
 
-//================================================
+// for maintaining
+func QueryConsumingOrdersToRenew(db DbOrTx, limit int) (int64, []*PurchaseOrder, error) {
 
-type DbOrTx interface {
-        Exec(query string, args ...interface{}) (sql.Result, error)
-        Prepare(query string) (*sql.Stmt, error)
-        Query(query string, args ...interface{}) (*sql.Rows, error)
-        QueryRow(query string, args ...interface{}) *sql.Row
+	sqlWhere := fmt.Sprintf("STATUS=%d", OrderStatus_Consuming)
+
+	// filter out pending orders
+	sqlWhere = sqlWhere + " and EVER_PAYED=1"
+
+	// ...
+
+	orderBy, sortOrder := "DEADLINE_TIME", SortOrder_Asc
+
+	sqlSort := fmt.Sprintf("%s %s", orderBy, sortOrder)
+
+	// ...
+
+	return getOrderList(db, 0, limit, sqlWhere, sqlSort)
 }
 
-//================================================
+//=======================================================================
+// 
+//=======================================================================
 
 func validateOffsetAndLimit(count int64, offset *int64, limit *int) {
 	if *limit < 1 {

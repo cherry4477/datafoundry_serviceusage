@@ -19,20 +19,20 @@ func StartMaintaining() {
 	Logger.Infof("Maintaining service started.")
 
 	timerRenewConsumingOrders := time.After(time.Minute)
-	timerSendRenewWarnings    := time.After(5 * time.Minute)
 	
 	for {
 		select {
 		case <-timerRenewConsumingOrders:
 			timerRenewConsumingOrders = TryToRenewConsumingOrders()
-		case <- timerSendRenewWarnings:
-			timerSendRenewWarnings = TryToSendRenewWarnings()
 		}
 	}
 }
 
+// find all consuming orders need to renew,
+// 1. if ordre is expired, change cpu/memory quotas to zero.
+// 2. try to renew them, 
+// 3. if balance is insufficient, send wanring emails.
 func TryToRenewConsumingOrders() (tm <- chan time.Time) {
-	/*
 	dur := 3 * time.Minute
 	defer func () {
 		tm = time.After(dur)
@@ -48,57 +48,41 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 	// ...
 
-	cursor, err := usage.GetConsumingOrdersToRenew(db)
+	numAll, orders, err := usage.QueryConsumingOrdersToRenew(db, 32)
 	if err != nil {
-		Logger.Debugf("TryToRenewConsumingOrders at %s error: %s", time.Now().Format("2006-01-02 15:04:05.999999"), err.Error())
+		Logger.Warningf("TryToRenewConsumingOrders at %s error: %s", time.Now().Format("2006-01-02 15:04:05.999999"), err.Error())
 	} else {
-		Logger.Debugf("TryToRenewConsumingOrders started at %s", time.Now().Format("2006-01-02 15:04:05.999999"))
+		Logger.Warningf("TryToRenewConsumingOrders started at %s", time.Now().Format("2006-01-02 15:04:05.999999"))
 
-		defer cursor.Close()
-		for {
-			s, err := cursor.Next()
+		for _, order := range orders {
+			plan, err := getPlanByID(order.Plan_id)
 			if err != nil {
-				Logger.Debugf("TryToRenewConsumingOrders cursor.Next error: %s", err.Error())
-			}
-			if s == nil {
-				break
+				Logger.Warningf("TryToRenewConsumingOrders getPlanByID (%s) error: %s", order.Plan_id, err.Error())
+				continue
 			}
 
-			err = subs.DenySubscriptionWithID(db, s.Subscription_id, "system: subscription applying denied for being expired")
+			_, err, _ = renewOrder(false, true, db, order, plan, nil)
 			if err != nil {
-				Logger.Warningf("TryToRenewConsumingOrders DeleteSubscription error: %s", err.Error())
-			} else {
-				Logger.Debugf("TryToRenewConsumingOrders done sub#%d", s.Subscription_id)
-				
-				s.Phase = subs.SubPhase_Denied
-				//subEventListener.Process(s)
+				Logger.Warningf("TryToRenewConsumingOrders renewOrder (%s) error: %s", order.Id, err.Error())
+				continue
 			}
 		}
 	}
 
-	d, err := subs.GetDurationToRenewNextConsumingOrder(db)
-	if err != nil {
-		Logger.Debugf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
+	// ...
+
+	if int(numAll) > len(orders) {
+		dur = time.Second
+		Logger.Debugf("TryToRenewConsumingOrders len(orders) == maxCount")
 	} else {
-		dur = d
+		d, err := usage.GetDurationToRenewNextConsumingOrder(db)
+		if err != nil {
+			Logger.Warningf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
+		} else {
+			dur = d
+		}
 	}
-	*/
 
-	return
-}
-
-func TryToSendRenewWarnings() (tm <- chan time.Time) {
-	/*
-
-	// todo:
-	// find all consuming orders which deadline < now()+7_days.
-	now := time.Now()
-	usage.
-
-	// ConsumeExtraInfo_RenewOrder
-
-	// if order is expired, change quota to 0
-*/
 	return
 }
 
@@ -111,7 +95,7 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 }
 
 // the return bool means insufficient balance or not
-func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
+func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
 
 	var err error
 	var lastConsume *usage.ConsumeHistory
@@ -138,7 +122,11 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	if lastConsume == nil {
 
 		paymentMoney = plan.Price
-		consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
+		if forRenewing {
+			consumExtraInfo = usage.ConsumeExtraInfo_RenewOrder
+		} else {
+			consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
+		}
 	} else {
 
 		var remaingMoney float32
@@ -219,7 +207,7 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
 
 		//err, insufficientBalance := makePayment(openshift.AdminToken(), order.Region, accountId, paymentMoney, paymentReason)
-		err, insufficientBalance := makePayment(order.Region, accountId, paymentMoney, paymentReason)
+		err, insufficientBalance := makePayment(order.Region, order.Account_id, paymentMoney, paymentReason)
 		if err != nil && insufficientBalance {
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
@@ -229,12 +217,14 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 			return 0.0, err, insufficientBalance
 		}
 
-		order.Last_consume_id = order.Last_consume_id + 1
+		// todo: looks this line is useless now. 
+		// for usage.RenewOrder will do it. 
+		//order.Last_consume_id = order.Last_consume_id + 1
 	}
 
 	// ...
 
-	order, err = usage.RenewOrder(db, order.Id, extendedDuration)
+	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration)
 	if err != nil {
 		// todo: retry
 
@@ -254,19 +244,20 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	}
 
 	// modify quota
-
-	go func() {
-		switch consumExtraInfo {
-		case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
-			err := changeDfProjectQuota(order.Creator, order.Region, accountId, plan)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("changeDfProjectQuota (%s, %s, %s) error: %s", 
-					order.Creator, accountId, plan.Plan_id, err.Error())
+	if ! forRenewing {
+		go func() {
+			switch consumExtraInfo {
+			case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
+				err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, plan)
+				if err != nil {
+					// todo: retry
+					
+					Logger.Warningf("changeDfProjectQuota (%s, %s, %s, %s) error: %s", 
+						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	// ...
 
