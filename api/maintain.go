@@ -157,8 +157,8 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	if paymentMoney > 0.0 {
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
 
-		//err, insufficientBalance := makePayment(openshift.AdminToken(), accountId, paymentMoney, paymentReason, order.Region)
-		err, insufficientBalance := makePayment(accountId, paymentMoney, paymentReason, order.Region)
+		//err, insufficientBalance := makePayment(openshift.AdminToken(), order.Region, accountId, paymentMoney, paymentReason)
+		err, insufficientBalance := makePayment(order.Region, accountId, paymentMoney, paymentReason)
 		if err != nil && insufficientBalance {
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
@@ -197,7 +197,7 @@ func renewOrder(drytry bool, db *sql.DB, accountId string, order *usage.Purchase
 	go func() {
 		switch consumExtraInfo {
 		case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
-			err := changeDfProjectQuota(order.Creator, accountId, plan)
+			err := changeDfProjectQuota(order.Creator, order.Region, accountId, plan)
 			if err != nil {
 				// todo: retry
 				

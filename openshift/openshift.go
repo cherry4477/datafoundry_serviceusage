@@ -266,10 +266,12 @@ type OpenshiftREST struct {
 	StatusCode int
 }
 
+// client can't be nil now!
 func NewOpenshiftREST(client *OpenshiftClient) *OpenshiftREST {
 	//if client == nil {
 	//	return &OpenshiftREST{oc: adminClient()}
 	//}
+	
 	return &OpenshiftREST{oc: client}
 }
 
@@ -423,7 +425,7 @@ func GetPodPortByName(pod *kapi.Pod, name string) *kapi.ContainerPort {
 	return nil
 }
 
-func GetReplicationControllersByLabels(serviceBrokerNamespace string, labels map[string]string) ([]kapi.ReplicationController, error) {
+func GetReplicationControllersByLabels(client *OpenshiftClient, serviceBrokerNamespace string, labels map[string]string) ([]kapi.ReplicationController, error) {
 
 	println("to list pods in", serviceBrokerNamespace)
 
@@ -431,7 +433,7 @@ func GetReplicationControllersByLabels(serviceBrokerNamespace string, labels map
 
 	rcs := kapi.ReplicationControllerList{}
 
-	osr := NewOpenshiftREST(nil).KList(uri, labels, &rcs)
+	osr := NewOpenshiftREST(client).KList(uri, labels, &rcs)
 	if osr.Err != nil {
 		return nil, osr.Err
 	}

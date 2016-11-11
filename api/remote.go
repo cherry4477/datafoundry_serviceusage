@@ -35,7 +35,7 @@ const (
 
 var (
 	//DataFoundryHost string
-	osClients map[string]*openshift.OpenshiftClient // region -> client
+	osAdminClients map[string]*openshift.OpenshiftClient // region -> client
 
 	PaymentService  string
 	PlanService     string
@@ -78,10 +78,10 @@ func initGateWay() {
 	var durPhase time.Duration
 	phaseSetp := time.Hour / NumDfRegions
 
-	osClients = make(map[string]*openshift.OpenshiftClient, NumDfRegions)
-	osClients[DfRegion_CnNorth01] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_1", durPhase)
+	osAdminClients = make(map[string]*openshift.OpenshiftClient, NumDfRegions)
+	osAdminClients[DfRegion_CnNorth01] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_1", durPhase)
 	durPhase += phaseSetp
-	osClients[DfRegion_CnNorth02] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_2", durPhase)
+	osAdminClients[DfRegion_CnNorth02] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_2", durPhase)
 	durPhase += phaseSetp
 
 	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT")))
@@ -104,7 +104,7 @@ func authDF(region, userToken string) (*userapi.User, error) {
 
 	u := &userapi.User{}
 	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
-	oc := osClients[region]
+	oc := osAdminClients[region]
 	if oc == nil {
 		return nil, fmt.Errorf("open shift client not found for region: %s")
 	}
@@ -146,7 +146,7 @@ func getDfProject(region, usernameForLog, userToken, project string) (*projectap
 	p := &projectapi.Project{}
 	
 	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
-	oc := osClients[region]
+	oc := osAdminClients[region]
 	if oc == nil {
 		return nil, fmt.Errorf("open shift client not found for region: %s", region)
 	}
@@ -200,7 +200,12 @@ const (
 const ProjectCpuMemoryQuotaName = "standard-quota"
 const ProjectCpuMemoryLimitsName = "standard-limits"
 
-func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
+func changeDfProjectQuota(usernameForLog, region, project string, plan *Plan) error {
+
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("changeDfProjectQuota: open shift client not found for region: %s", region)
+	}
 
 	// ...
 
@@ -244,7 +249,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			ResourceRequestsMemory: memQuantity,
 		}
 
-		osRest := openshift.NewOpenshiftREST(nil)
+		osRest := openshift.NewOpenshiftREST(oc)
 
 		oldQuota := kapi.ResourceQuota {}
 		osRest.KGet(fullUri, &oldQuota)
@@ -256,7 +261,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			}
 
 			// create new
-			osRest = openshift.NewOpenshiftREST(nil)
+			osRest = openshift.NewOpenshiftREST(oc)
 			osRest.KPost(uri, &quota, nil) 
 			if osRest.Err != nil {
 				Logger.Warningf("create quota (%s) error: %s", uri, osRest.Err)
@@ -267,7 +272,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			// todo: if old and new are equal, do nothing
 
 			// update quota
-			osRest = openshift.NewOpenshiftREST(nil)
+			osRest = openshift.NewOpenshiftREST(oc)
 			osRest.KPut(fullUri, &quota, nil)
 			if osRest.Err != nil {
 				Logger.Warningf("update quota (%s) error: %s", fullUri, osRest.Err)
@@ -319,7 +324,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			},
 		}
 
-		osRest := openshift.NewOpenshiftREST(nil)
+		osRest := openshift.NewOpenshiftREST(oc)
 
 		oldLimit := kapi.LimitRange {}
 		osRest.KGet(fullUri, &oldLimit)
@@ -331,7 +336,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			}
 
 			// create new
-			osRest = openshift.NewOpenshiftREST(nil)
+			osRest = openshift.NewOpenshiftREST(oc)
 			osRest.KPost(uri, &limit, nil) 
 			if osRest.Err != nil {
 				Logger.Warningf("create limit (%s) error: %s", uri, osRest.Err)
@@ -342,7 +347,7 @@ func changeDfProjectQuota(usernameForLog, project string, plan *Plan) error {
 			// todo: if old and new are equal, do nothing
 
 			// update limit
-			osRest = openshift.NewOpenshiftREST(nil)
+			osRest = openshift.NewOpenshiftREST(oc)
 			osRest.KPut(fullUri, &limit, nil)
 			if osRest.Err != nil {
 				Logger.Warningf("update limit (%s) error: %s", fullUri, osRest.Err)
@@ -466,14 +471,14 @@ const ErrorCodeUpdateBalance = 1309
 
 // the return bool means insufficient balance or not
 //func makePayment(adminToken, accountId string, money float32, reason, region string) (error, bool) {
-func makePayment(accountId string, money float32, reason, region string) (error, bool) {
+func makePayment(region, accountId string, money float32, reason string) (error, bool) {
 	if Debug {
 		return nil, false
 	}
 
-	oc := osClients[region]
+	oc := osAdminClients[region]
 	if oc == nil {
-		return fmt.Errorf("open shift client not found for region: %s", region), false
+		return fmt.Errorf("makePayment: open shift client not found for region: %s", region), false
 	}
 	adminToken := oc.BearerToken()
 
