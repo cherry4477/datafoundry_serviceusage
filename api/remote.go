@@ -367,17 +367,35 @@ func changeDfProjectQuota(usernameForLog, region, project string, plan *Plan) er
 
 const PLanCircle_Month = "m"
 
+const MaxPlanTypeLength = 16
 // !!! plan types should NOT contains "_", see genOrderID for details,
-const PLanType_Quota  = "resources"
+const PLanType_Quotas = "resources"
 const PLanType_Volume = "volume"
 const PLanType_BSI    = "bsi"
+
+func isValidPlanType(planType string) bool {
+	if len(planType) > MaxPlanTypeLength {
+		return false
+	}
+
+	switch planType {
+	case PLanType_Quotas:
+		return true
+	case PLanType_Volume:
+		return true
+	case PLanType_BSI:
+		return true
+	}
+
+	return false
+}
 
 // for quotas plans, specification1 stores the cpu cores, specification2 stores the memory size
 func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	//"specification1": "16 CPU Cores",
 	//"specification2": "32 GB RAM"，
 
-	if plan.Plan_type != PLanType_Quota {
+	if plan.Plan_type != PLanType_Quotas {
 		return 0, 0, fmt.Errorf("not a quota plan: %s", plan.Plan_type)
 	}
 	
@@ -406,11 +424,10 @@ func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 
 // for volume plans, specification1 stores the disk size
 func (plan *Plan) ParsePlanVolume() (int, error) {
-	//"specification1": "16 CPU Cores",
-	//"specification2": "32 GB RAM"，
+	//"specification1": "16 GB",
 
 	if plan.Plan_type != PLanType_Volume {
-		return 0, 0, fmt.Errorf("not a quota plan: %s", plan.Plan_type)
+		return 0, fmt.Errorf("not a volume plan: %s", plan.Plan_type)
 	}
 	
 	var index int
@@ -450,7 +467,7 @@ func getPlanByID(planId string) (*Plan, error) {
 			Id: 123,
 			Plan_id: planId,
 			Plan_name: "plan1",
-			Plan_type: PLanType_Quota,
+			Plan_type: PLanType_Quotas,
 			Price: 12.3,
 			Cycle: PLanCircle_Month,
 			Region: "bj",

@@ -48,7 +48,7 @@ func genUUID() string {
 
 func genOrderID(accountId, planType string) string {
 	switch planType {
-	case PLanType_Quota:
+	case PLanType_Quotas:
 		return fmt.Sprintf("%s-%s", accountId, planType)
 		// most one order allowed for such plan types
 	}
@@ -242,6 +242,11 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// assert planId == plan.Plan_id 
 	planType := plan.Plan_type
 	planRegion := plan.Region
+
+	if ! isValidPlanType(planType) {
+		JsonResult(w, http.StatusBadRequest, newInvalidParameterError("plan type is invalid"), nil)
+		return
+	}
 
 	// ...
 

@@ -248,23 +248,17 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 			Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
 			//return paymentMoney, err, false
 		}
-	}
+	}()
 
 	// ...
-
-	if ! forRenewing {
-		swtich plan.Plan_type {
-		case PLanType_Quotas:
-		case PLanType_Volume:
-		}
-	}
 
 	go func() {
 		if forRenewing {
 			return
 		}
 
-		swtich plan.Plan_type {
+		switch plan.Plan_type {
+
 		case PLanType_Quotas:
 
 			switch consumExtraInfo {
@@ -281,6 +275,10 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 		case PLanType_Volume:
 
 			// todo: create pvc
+
+		case PLanType_BSI:
+
+			// todo: create bsi
 		}
 	}()
 

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
    REGION             VARCHAR(32) NOT NULL COMMENT 'for query',
    PLAN_ID            VARCHAR(64) NOT NULL,
-   PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
+   PLAN_TYPE          VARCHAR(16) NOT NULL COMMENT 'for query',
    START_TIME         DATETIME,
    END_TIME           DATETIME COMMENT 'invalid when status is consuming',
    DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
