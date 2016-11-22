@@ -63,6 +63,8 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 				continue
 			}
 
+			// todo: if expired ...
+
 			_, err, _ = renewOrder(false, true, db, order, plan, nil)
 			if err != nil {
 				Logger.Warningf("TryToRenewConsumingOrders renewOrder (%s) error: %s", order.Id, err.Error())
@@ -234,20 +236,37 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 		return paymentMoney, err, false
 	}
 
-	now := time.Now()
+	// ...
 
-	// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
-	err = usage.CreateConsumeHistory(db, order, now, plan.Price, plan.Id, consumExtraInfo)
-	if err != nil {
-		// todo: retry
+	go func() {
 
-		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
-		return paymentMoney, err, false
+		// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
+		err = usage.CreateConsumeHistory(db, order, time.Now(), plan.Price, plan.Id, consumExtraInfo)
+		if err != nil {
+			// todo: retry
+
+			Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
+			//return paymentMoney, err, false
+		}
 	}
 
-	// modify quota
+	// ...
+
 	if ! forRenewing {
-		go func() {
+		swtich plan.Plan_type {
+		case PLanType_Quotas:
+		case PLanType_Volume:
+		}
+	}
+
+	go func() {
+		if forRenewing {
+			return
+		}
+
+		swtich plan.Plan_type {
+		case PLanType_Quotas:
+
 			switch consumExtraInfo {
 			case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
 				err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, plan)
@@ -258,13 +277,19 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 				}
 			}
-		}()
-	}
+
+		case PLanType_Volume:
+
+			// todo: create pvc
+		}
+	}()
 
 	// ...
 
 	return paymentMoney, nil, false
 }
+
+// PLanType_Volume
 
 /*
 func renewOrder_old(accountId, orderId string, plan *Plan, renewReason string) error {

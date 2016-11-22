@@ -106,7 +106,7 @@ func authDF(region, userToken string) (*userapi.User, error) {
 	//osRest := openshift.NewOpenshiftREST(openshift.NewOpenshiftClient(userToken))
 	oc := osAdminClients[region]
 	if oc == nil {
-		return nil, fmt.Errorf("open shift client not found for region: %s")
+		return nil, fmt.Errorf("user noud found @ region (%s).")
 	}
 	oc = oc.NewOpenshiftClient(userToken)
 	osRest := openshift.NewOpenshiftREST(oc)
@@ -365,27 +365,14 @@ func changeDfProjectQuota(usernameForLog, region, project string, plan *Plan) er
 // 
 //=======================================================================
 
-// !!! plan types should NOT contains "_", see genOrderID for details,
-const PLanType_Quota = "c"
-
 const PLanCircle_Month = "m"
 
-type Plan struct {
-	Id              int64     `json:"id,omitempty"`
-	Plan_id         string    `json:"plan_id,omitempty"`
-	Plan_name       string    `json:"plan_name,omitempty"`
-	Plan_type       string    `json:"plan_type,omitempty"`
-	Plan_level      int       `json:"plan_level,omitempty"`
-	Specification1  string    `json:"specification1,omitempty"`
-	Specification2  string    `json:"specification2,omitempty"`
-	Price           float32   `json:"price,omitempty"`
-	Cycle           string    `json:"cycle,omitempty"`
-	Region          string    `json:"region,omitempty"`
-	Region_describe string    `json:"region_describe,omitempty"`
-	Create_time     time.Time `json:"creation_time,omitempty"`
-	Status          string    `json:"status,omitempty"`
-}
+// !!! plan types should NOT contains "_", see genOrderID for details,
+const PLanType_Quota  = "resources"
+const PLanType_Volume = "volume"
+const PLanType_BSI    = "bsi"
 
+// for quotas plans, specification1 stores the cpu cores, specification2 stores the memory size
 func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	//"specification1": "16 CPU Cores",
 	//"specification2": "32 GB RAM"，
@@ -415,6 +402,45 @@ func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	}
 
 	return cpus, mems, nil
+}
+
+// for volume plans, specification1 stores the disk size
+func (plan *Plan) ParsePlanVolume() (int, error) {
+	//"specification1": "16 CPU Cores",
+	//"specification2": "32 GB RAM"，
+
+	if plan.Plan_type != PLanType_Volume {
+		return 0, 0, fmt.Errorf("not a quota plan: %s", plan.Plan_type)
+	}
+	
+	var index int
+
+	index = strings.Index(plan.Specification1, " GB")
+	if index < 0 {
+		return 0, fmt.Errorf("invalid volume format: %s", plan.Specification1)
+	}
+	vols, err := strconv.Atoi(plan.Specification1[:index])
+	if err != nil || vols < 1 { // vols should be times of 10, here not check it carefully.
+		return 0, fmt.Errorf("invalid volume format: %s", plan.Specification1)
+	}
+
+	return vols, nil
+}
+
+type Plan struct {
+	Id              int64     `json:"id,omitempty"`
+	Plan_id         string    `json:"plan_id,omitempty"`
+	Plan_name       string    `json:"plan_name,omitempty"`
+	Plan_type       string    `json:"plan_type,omitempty"`
+	Plan_level      int       `json:"plan_level,omitempty"`
+	Specification1  string    `json:"specification1,omitempty"`
+	Specification2  string    `json:"specification2,omitempty"`
+	Price           float32   `json:"price,omitempty"`
+	Cycle           string    `json:"cycle,omitempty"`
+	Region          string    `json:"region,omitempty"`
+	Region_describe string    `json:"region_describe,omitempty"`
+	Create_time     time.Time `json:"creation_time,omitempty"`
+	Status          string    `json:"status,omitempty"`
 }
 
 // todo: add historyId to retrieve history info?
