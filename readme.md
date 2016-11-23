@@ -23,7 +23,7 @@
 
 用户创建一个订单。
 
-Path Parameters:
+Query Parameters:
 ```
 drytry: 0|1, 如果为1，将不真正生成订单，而只是返回创建订单所需金额。
 ```
@@ -32,6 +32,10 @@ Body Parameters (json):
 ```
 namespace: 可省略，默认为当前用户名称
 plan_id: 套餐Id，不可省略。
+volume_name: pvc名称。
+bsi_name: bsi名称。
+bs_name: bs名称。
+bs_plan: bs套餐名称。
 ```
 
 Return Result (json):

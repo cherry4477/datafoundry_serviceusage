@@ -36,20 +36,23 @@ const (
 var (
 	//DataFoundryHost string
 	osAdminClients map[string]*openshift.OpenshiftClient // region -> client
+	VolumeServices map[string]string                     // region -> service
 
 	PaymentService  string
 	PlanService     string
 	RechargeSercice string
+	VolumeSercice   string
 )
 
-func BuildDataFoundryClient(infoEnv string, durPhase time.Duration) *openshift.OpenshiftClient {
+func BuildDataFoundryClient(infoEnv string, durPhase time.Duration) (*openshift.OpenshiftClient, string) {
 	info := os.Getenv(infoEnv)
 	params := strings.Split(strings.TrimSpace(info), " ")
-	if len(params) != 3 {
+	if len(params) != 4 {
 		Logger.Fatal("BuildDataFoundryClient, len(params) is not correct: ", len(params))
 	}
 
-	return openshift.CreateOpenshiftClient(infoEnv, params[0], params[1], params[2], durPhase)
+	return openshift.CreateOpenshiftClient(infoEnv, params[0], params[1], params[2], durPhase),
+		params[3]
 }
 
 func BuildServiceUrlPrefixFromEnv(name string, isHttps bool, address string, port string) string {
@@ -76,17 +79,28 @@ func initGateWay() {
 	//DataFoundryHost = BuildServiceUrlPrefixFromEnv("DataFoundryHost", true, os.Getenv("DATAFOUNDRY_HOST_ADDR"), "")
 	//openshift.Init(DataFoundryHost, os.Getenv("DATAFOUNDRY_ADMIN_USER"), os.Getenv("DATAFOUNDRY_ADMIN_PASS"))
 	var durPhase time.Duration
-	phaseSetp := time.Hour / NumDfRegions
+	phaseStep := time.Hour / NumDfRegions
+
+	// ...
 
 	osAdminClients = make(map[string]*openshift.OpenshiftClient, NumDfRegions)
-	osAdminClients[DfRegion_CnNorth01] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_1", durPhase)
-	durPhase += phaseSetp
-	osAdminClients[DfRegion_CnNorth02] = BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_2", durPhase)
-	durPhase += phaseSetp
+	VolumeServices = make(map[string]string, NumDfRegions)
+
+	osAdminClients[DfRegion_CnNorth01], VolumeServices[DfRegion_CnNorth01] = 
+		BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_1", durPhase)
+	durPhase += phaseStep
+	osAdminClients[DfRegion_CnNorth02], VolumeServices[DfRegion_CnNorth02] = 
+		BuildDataFoundryClient("DATAFOUNDRY_INFO_CN_NORTH_2", durPhase)
+	durPhase += phaseStep
+
+	// ...
+
+	// ...
 
 	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT")))
 	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT")))
 	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT")))
+	VolumeSercice = BuildServiceUrlPrefixFromEnv("VolumeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYVOLUME_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYVOLUME_SERVICE_PORT")))
 }
 
 //================================================================
@@ -550,4 +564,76 @@ func makePayment(region, accountId string, money float32, reason string) (error,
 	}
 	
 	return nil, false
+}
+
+//=======================================================================
+// 
+//=======================================================================
+
+func createPersistentVolume(usernameForLog, region, project string, plan *Plan) error {
+
+	/*
+	volumeService := VolumeServices[region]
+	if volumeService == nil {
+		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
+	}
+
+	// ...
+
+	sizeGB, err := plan.ParsePlanVolume()
+	if err != nil {
+		return err
+	}
+
+	// ...
+
+	err = CreateVolumn(project, volName, sizeGB)
+	if err != nil {
+		return err
+	}
+	*/
+
+	return nil
+}
+
+type VolumnCreateOptions struct {
+	Name string     `json:"name,omitempty"`
+	Size int        `json:"size,omitempty"`
+	kapi.ObjectMeta `json:"metadata,omitempty"`
+}
+
+func CreateVolumn(namespace, volumnName string, size int) error {
+	/*
+	oc := OC()
+
+	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes"
+
+	options := &VolumnCreateOptions{
+		volumnName,
+		size,
+		kapi.ObjectMeta {
+			Annotations: map[string]string {
+				"dadafoundry.io/create-by": oc.username,
+			},
+		},
+	}
+	
+	err := dfRequest("POST", url, oc.BearerToken(), options, nil)
+
+	return err
+	*/
+	return nil
+}
+
+func DeleteVolumn(namespace, volumnName string) error {
+	/*
+	oc := OC()
+
+	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes/" + volumnName
+	
+	err := dfRequest("DELETE", url, oc.BearerToken(), nil, nil)
+	
+	return err
+	*/
+	return nil
 }

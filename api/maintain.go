@@ -29,7 +29,10 @@ func StartMaintaining() {
 }
 
 // find all consuming orders need to renew,
-// 1. if ordre is expired, change cpu/memory quotas to zero.
+// 1. if ordre is expired, 
+//    > change cpu/memory quotas to zero.
+//    > delete volume ...
+//    > delete bsi ...
 // 2. try to renew them, 
 // 3. if balance is insufficient, send wanring emails.
 func TryToRenewConsumingOrders() (tm <- chan time.Time) {
@@ -274,7 +277,13 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 
 		case PLanType_Volume:
 
-			// todo: create pvc
+			err := createPersistentVolume(order.Creator, order.Region, order.Account_id, plan)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("createPersistentVolume (%s, %s, %s, %s) error: %s", 
+					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+			}
 
 		case PLanType_BSI:
 

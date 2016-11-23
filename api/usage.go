@@ -15,6 +15,7 @@ import (
 	"github.com/asiainfoLDP/datahub_commons/common"
 
 	"github.com/asiainfoLDP/datafoundry_serviceusage/usage"
+	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
 )
 
 //==================================================================
@@ -93,6 +94,16 @@ func validateOrderMode(modeName string) (int, *Error) {
 	return -1, newInvalidParameterError("invalid mode parameter")
 }
 */
+
+
+
+func validateDfResName(resName string) *Error {
+	if openshift.IsDNS1123Label(resName) {
+		return nil
+	}
+	
+	return newInvalidParameterError(fmt.Sprintf("%s is not a legal df res name", resName))
+}
 
 func validateOrderAutoGenID(idstr string) (int64, *Error) {
 	// GetError2(ErrorCodeInvalidParameters, err.Error())
@@ -199,6 +210,12 @@ type OrderCreation struct {
 	AccountID string    `json:"namespace,omitempty"`
 	PlanID    string    `json:"plan_id,omitempty"`
 	//Creator   string    `json:"creator,omitempty"`
+
+	VolumeName string   `json:"volume_name,omitempty"`
+
+	BsiName string      `json:"bsi_name,omitempty"`
+	BsName string       `json:"bs_name,omitempty"`
+	BsPlan string       `json:"bs_plan,omitempty"`
 }
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -249,6 +266,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 
 	// ...
+
+	// e = validateDfResName(volumeName)
 
 	// auth
 
