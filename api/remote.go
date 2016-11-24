@@ -41,7 +41,6 @@ var (
 	PaymentService  string
 	PlanService     string
 	RechargeSercice string
-	VolumeSercice   string
 )
 
 func BuildDataFoundryClient(infoEnv string, durPhase time.Duration) (*openshift.OpenshiftClient, string) {
@@ -100,7 +99,6 @@ func initGateWay() {
 	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT")))
 	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT")))
 	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT")))
-	VolumeSercice = BuildServiceUrlPrefixFromEnv("VolumeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYVOLUME_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYVOLUME_SERVICE_PORT")))
 }
 
 //================================================================
