@@ -466,7 +466,7 @@ func (plan *Plan) ParsePlanBSI() (string, string, error) {
 		return "", "", fmt.Errorf("not a bsi plan: %s", plan.Plan_type)
 	}
 
-	return "", "", nil
+	return "", "", fmt.Errorf("not implemented yet")
 }
 
 type Plan struct {
