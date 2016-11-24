@@ -568,11 +568,19 @@ func makePayment(region, accountId string, money float32, reason string) (error,
 // 
 //=======================================================================
 
-func createPersistentVolume(usernameForLog, volumeName, region, project string, plan *Plan) error {
+type VolumnCreateOptions struct {
+	Name string     `json:"name,omitempty"`
+	Size int        `json:"size,omitempty"`
+	kapi.ObjectMeta `json:"metadata,omitempty"`
+}
 
-	/*
+func createPersistentVolume(usernameForLog, volumeName, region, project string, plan *Plan) error {
+	if Debug {
+		return nil
+	}
+
 	volumeService := VolumeServices[region]
-	if volumeService == nil {
+	if volumeService == "" {
 		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
 	}
 
@@ -585,19 +593,41 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 
 	// ...
 
-	err = CreateVolumn(project, volName, sizeGB)
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("createPersistentVolume: open shift client not found for region: %s", region)
+	}
+	adminToken := oc.BearerToken()
+
+	var vco = &VolumnCreateOptions{
+		volumeName,
+		sizeGB,
+		kapi.ObjectMeta {
+			Annotations: map[string]string {
+				"dadafoundry.io/create-by": usernameForLog,
+			},
+		},
+	}
+	body, err := json.Marshal(vco)
 	if err != nil {
+		Logger.Infof("createPersistentVolume Marshal error: %s", err.Error())
 		return err
 	}
-	*/
+
+	url := fmt.Sprintf("%s/namespaces/%s/volumes", volumeService, project)
+
+	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
+	if err != nil {
+		Logger.Infof("createPersistentVolume error: %s", err.Error())
+		return err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		Logger.Infof("createPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		return fmt.Errorf("createPersistentVolume remote (%s) status code: %d.", url, response.StatusCode)
+	}
 
 	return nil
-}
-
-type VolumnCreateOptions struct {
-	Name string     `json:"name,omitempty"`
-	Size int        `json:"size,omitempty"`
-	kapi.ObjectMeta `json:"metadata,omitempty"`
 }
 
 func CreateVolumn(namespace, volumnName string, size int) error {

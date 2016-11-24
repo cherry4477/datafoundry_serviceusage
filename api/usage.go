@@ -378,7 +378,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	paymentMoney, err, insufficientBalance := renewOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
+	paymentMoney, err, insufficientBalance := createOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
 	if err != nil {
 		var errCode uint = ErrorCodeRenewOrder
 		if insufficientBalance {

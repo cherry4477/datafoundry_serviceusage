@@ -60,17 +60,28 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 		Logger.Warningf("TryToRenewConsumingOrders started at %s", time.Now().Format("2006-01-02 15:04:05.999999"))
 
 		for _, order := range orders {
+			// 
 			plan, err := getPlanByID(order.Plan_id)
 			if err != nil {
-				Logger.Warningf("TryToRenewConsumingOrders getPlanByID (%s) error: %s", order.Plan_id, err.Error())
+				Logger.Errorf("TryToRenewConsumingOrders getPlanByID (%s) error: %s", order.Plan_id, err.Error())
 				continue
 			}
 
-			// todo: if expired ...
+			// todo: if expired ... 
 
-			_, err, _ = renewOrder(false, db, nil, order, plan, nil)
+			_, err, insufficientBalance := createOrder(false, db, nil, order, plan, nil)
 			if err != nil {
-				Logger.Warningf("TryToRenewConsumingOrders renewOrder (%s) error: %s", order.Id, err.Error())
+				Logger.Warningf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
+
+				if insufficientBalance {
+					// expired?
+					if order.Deadline_time.Before(time.Now()) {
+						// todo: cancel order
+					} else {
+						// todo: send warning email
+					}
+				}
+				
 				continue
 			}
 		}
@@ -101,8 +112,9 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 	return fmt.Sprintf("order:%s:%d", orderId, renewTimes) // DON'T change
 }
 
+// createParams == nil for renew.
 // the return bool means insufficient balance or not
-func renewOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
+func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
 
 	var err error
 	var lastConsume *usage.ConsumeHistory
@@ -256,7 +268,7 @@ func renewOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, orde
 	// ...
 
 	go func() {
-		if createParams == nil {
+		if createParams == nil { // 
 			return
 		}
 
