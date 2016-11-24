@@ -363,6 +363,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		Status: usage.OrderStatus_Pending,
 
 		Creator: creator,
+
+		Resource_name: orderCreation.Params.ResName,
 	}
 
 	// drytry=1: don't create order actually

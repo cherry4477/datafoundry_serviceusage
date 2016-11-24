@@ -16,6 +16,7 @@ import (
 	"github.com/asiainfoLDP/datafoundry_serviceusage/openshift"
 	userapi "github.com/openshift/origin/pkg/user/api/v1"
 	projectapi "github.com/openshift/origin/pkg/project/api/v1"
+	backingserviceinstanceapi "github.com/openshift/origin/pkg/backingserviceinstance/api/v1"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
 	kapiresource "k8s.io/kubernetes/pkg/api/resource"
 )
@@ -456,6 +457,18 @@ func (plan *Plan) ParsePlanVolume() (int, error) {
 	return vols, nil
 }
 
+// todo:
+// for bsi plans, 
+func (plan *Plan) ParsePlanBSI() (string, string, error) {
+	//"specification1": "16 GB",
+
+	if plan.Plan_type != PLanType_BSI {
+		return "", "", fmt.Errorf("not a bsi plan: %s", plan.Plan_type)
+	}
+
+	return "", "", nil
+}
+
 type Plan struct {
 	Id              int64     `json:"id,omitempty"`
 	Plan_id         string    `json:"plan_id,omitempty"`
@@ -579,11 +592,6 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 		return nil
 	}
 
-	volumeService := VolumeServices[region]
-	if volumeService == "" {
-		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
-	}
-
 	// ...
 
 	sizeGB, err := plan.ParsePlanVolume()
@@ -614,6 +622,11 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 		return err
 	}
 
+	volumeService := VolumeServices[region]
+	if volumeService == "" {
+		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
+	}
+
 	url := fmt.Sprintf("%s/namespaces/%s/volumes", volumeService, project)
 
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
@@ -630,30 +643,7 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 	return nil
 }
 
-func CreateVolumn(namespace, volumnName string, size int) error {
-	/*
-	oc := OC()
-
-	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes"
-
-	options := &VolumnCreateOptions{
-		volumnName,
-		size,
-		kapi.ObjectMeta {
-			Annotations: map[string]string {
-				"dadafoundry.io/create-by": oc.username,
-			},
-		},
-	}
-	
-	err := dfRequest("POST", url, oc.BearerToken(), options, nil)
-
-	return err
-	*/
-	return nil
-}
-
-func DeleteVolumn(namespace, volumnName string) error {
+func destroyPersistentVolume(volumeName, region, project string) error {
 	/*
 	oc := OC()
 
@@ -671,7 +661,44 @@ func DeleteVolumn(namespace, volumnName string) error {
 //=======================================================================
 
 func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) error {
+	if Debug {
+		return nil
+	}
+
+	// ...
+
+	serviceName, servicePlanUUID, err := plan.ParsePlanBSI()
+	if err != nil {
+		return err
+	}
+
+	// ...
+
+	inputBSI := backingserviceinstanceapi.BackingServiceInstance {}
+	inputBSI.Name = bsiName
+	inputBSI.Spec.BackingServiceName =serviceName
+	inputBSI.Spec.BackingServicePlanGuid = servicePlanUUID
+
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
+	}
+	uri := "/namespaces/"+project+"/backingserviceinstances"
+	osRest := openshift.NewOpenshiftREST(oc)
+	osRest.KPost(uri, &inputBSI, nil)
+	if osRest.Err != nil {
+		Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+		return osRest.Err
+	}
+
 	return nil
 }
+
+func destroyBSI(bsiName, region, project string) error {
+	// todo: unbind all and deprovision
+
+	return nil
+}
+
 
 

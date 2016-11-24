@@ -42,6 +42,7 @@ type PurchaseOrder struct {
 	Status            int        `json:"_,omitempty"`      // po
 	StatusLabel       string     `json:"status,omitempty"` // vo
 	Creator           string     `json:"creator,omitempty"`
+	Resource_name     string     `json:"resource_name,omitempty"`
 }
 
 func orderPO2VO(order *PurchaseOrder) {
@@ -100,14 +101,14 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 				ACCOUNT_ID, REGION, 
 				PLAN_ID, PLAN_TYPE, 
 				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
-				CREATOR, STATUS, 
+				CREATOR, STATUS, RESOURCE_NAME,
 				RENEW_RETRIES
 				) values (
 				?, 
 				?, ?, 
 				?, ?, 
 				'%s', '%s', '%s', 0, 0,
-				?, ?, 
+				?, ?, ?,
 				0
 				)`, 
 				startTime, endTime, consumeTime,
@@ -116,7 +117,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 				orderInfo.Order_id, 
 				orderInfo.Account_id, orderInfo.Region,  
 				orderInfo.Plan_id, orderInfo.Plan_type, 
-				orderInfo.Creator, orderInfo.Status,  
+				orderInfo.Creator, orderInfo.Status, orderInfo.Resource_name, 
 				)
 	if err != nil {
 		return 0, err
@@ -770,7 +771,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 					ACCOUNT_ID, REGION, 
 					PLAN_ID, PLAN_TYPE,
 					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
-					CREATOR, STATUS, 
+					CREATOR, STATUS, RESOURCE_NAME, 
 					RENEW_RETRIES
 					from DF_PURCHASE_ORDER
 					%s
@@ -799,7 +800,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 			&order.Account_id, &order.Region, 
 			&order.Plan_id, &order.Plan_type, 
 			&order.Start_time, &order.End_time, &order.Deadline_time, &order.Last_consume_id, &order.Ever_payed,
-			&order.Creator, &order.Status, 
+			&order.Creator, &order.Status, &order.Resource_name, 
 			&order.Num_renew_retires,
 		)
 		if err != nil {

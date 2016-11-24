@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
    RENEW_RETRIES      TINYINT DEFAULT 0 COMMENT 'num renew fails, most 100',
    STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
    CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
+   RESOURCE_NAME      VARCHAR(64) NOT NULL COMMENT 'volume name, bsi name, ...',
    PRIMARY KEY (ID)
 )  DEFAULT CHARSET=UTF8;
 
