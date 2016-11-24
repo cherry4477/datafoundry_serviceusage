@@ -32,10 +32,8 @@ Body Parameters (json):
 ```
 namespace: 可省略，默认为当前用户名称
 plan_id: 套餐Id，不可省略。
-volume_name: pvc名称。
-bsi_name: bsi名称。
-bs_name: bs名称。
-bs_plan: bs套餐名称。
+parameters:
+parameters.resource_name: 某些类型的套餐需要。pvc name / bsi name / etc.
 ```
 
 Return Result (json):

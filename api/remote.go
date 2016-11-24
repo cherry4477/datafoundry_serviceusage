@@ -568,7 +568,7 @@ func makePayment(region, accountId string, money float32, reason string) (error,
 // 
 //=======================================================================
 
-func createPersistentVolume(usernameForLog, region, project string, plan *Plan) error {
+func createPersistentVolume(usernameForLog, volumeName, region, project string, plan *Plan) error {
 
 	/*
 	volumeService := VolumeServices[region]
@@ -635,3 +635,13 @@ func DeleteVolumn(namespace, volumnName string) error {
 	*/
 	return nil
 }
+
+//=======================================================================
+// 
+//=======================================================================
+
+func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) error {
+	return nil
+}
+
+

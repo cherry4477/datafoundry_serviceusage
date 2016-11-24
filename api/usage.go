@@ -206,16 +206,18 @@ func canManagePurchaseOrders(username string) bool {
 // 
 //==================================================================
 
+
+type OrderCreationParams struct {
+	ResName string  `json:"resource_name,omitempty"`
+		// may be VolumeName, BsiName, etc.
+}
+
 type OrderCreation struct {
 	AccountID string    `json:"namespace,omitempty"`
 	PlanID    string    `json:"plan_id,omitempty"`
 	//Creator   string    `json:"creator,omitempty"`
 
-	VolumeName string   `json:"volume_name,omitempty"`
-
-	BsiName string      `json:"bsi_name,omitempty"`
-	BsName string       `json:"bs_name,omitempty"`
-	BsPlan string       `json:"bs_plan,omitempty"`
+	Params OrderCreationParams `json:"parameters,omitempty"`
 }
 
 func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -267,7 +269,13 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
-	// e = validateDfResName(volumeName)
+	if orderCreation.Params.ResName != "" {
+		e = validateDfResName(orderCreation.Params.ResName)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
 
 	// auth
 
@@ -370,7 +378,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	paymentMoney, err, insufficientBalance := renewOrder(drytry, false, db, order, plan, oldOrder)
+	paymentMoney, err, insufficientBalance := renewOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
 	if err != nil {
 		var errCode uint = ErrorCodeRenewOrder
 		if insufficientBalance {

@@ -68,7 +68,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 			// todo: if expired ...
 
-			_, err, _ = renewOrder(false, true, db, order, plan, nil)
+			_, err, _ = renewOrder(false, db, nil, order, plan, nil)
 			if err != nil {
 				Logger.Warningf("TryToRenewConsumingOrders renewOrder (%s) error: %s", order.Id, err.Error())
 				continue
@@ -102,7 +102,7 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 }
 
 // the return bool means insufficient balance or not
-func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
+func renewOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
 
 	var err error
 	var lastConsume *usage.ConsumeHistory
@@ -129,7 +129,7 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 	if lastConsume == nil {
 
 		paymentMoney = plan.Price
-		if forRenewing {
+		if createParams == nil {
 			consumExtraInfo = usage.ConsumeExtraInfo_RenewOrder
 		} else {
 			consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
@@ -256,7 +256,7 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 	// ...
 
 	go func() {
-		if forRenewing {
+		if createParams == nil {
 			return
 		}
 
@@ -277,7 +277,7 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 
 		case PLanType_Volume:
 
-			err := createPersistentVolume(order.Creator, order.Region, order.Account_id, plan)
+			err := createPersistentVolume(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
 			if err != nil {
 				// todo: retry
 				
@@ -287,7 +287,13 @@ func renewOrder(drytry, forRenewing bool, db *sql.DB, order *usage.PurchaseOrder
 
 		case PLanType_BSI:
 
-			// todo: create bsi
+			err := createBSI(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("createBSI (%s, %s, %s, %s) error: %s", 
+					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+			}
 		}
 	}()
 
