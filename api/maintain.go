@@ -51,6 +51,43 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 	// ...
 
+	const EndOrderMargin = 7 * 24 * time.Hour
+
+	onInsufficientBalance := func(order *usage.PurchaseOrder, plan *Plan) {
+		if time.Now().Before(order.Deadline_time.Add(EndOrderMargin)) {
+			
+			// todo: send warning email
+
+			return
+		}
+
+		// destroy ordered resources
+
+		switch plan.Plan_type {
+
+		case PLanType_Quotas:
+
+			// todo: zero quotas
+
+		case PLanType_Volume:
+
+			// todo: delete volume
+
+		case PLanType_BSI:
+
+			// todo: destroy bsi
+		}
+
+		// end order
+
+		//err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
+		//if err != nil {
+		//	return 0.0, fmt.Errorf("end expired order (%s) error: %s", lastConsume.Order_id, err.Error()), false
+		//}
+	}
+
+	// ...
+
 	const RenewMargin = 7 * 24 * time.Hour
 
 	numAll, orders, err := usage.QueryConsumingOrdersToRenew(db, RenewMargin, 32)
@@ -74,22 +111,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 				Logger.Errorf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
 
 				if insufficientBalance {
-					if time.Now().Before(order.Deadline_time) {
-						
-						// todo: send warning email
-
-						continue
-					}
-
-					// so it is expired
-
-					// todo: cancel order
-
-					// zero quotas
-
-					// delete volume
-
-					// destroy bsi
+					onInsufficientBalance(order, plan)
 				}
 				
 				continue
@@ -277,13 +299,15 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	// ...
 
-	go func() {
+	//go 
+	finalErr := func() error {
 		if createParams == nil { // 
-			return
+			return nil
 		}
 
 		switch plan.Plan_type {
-
+		default:
+			return nil
 		case PLanType_Quotas:
 
 			switch consumExtraInfo {
@@ -294,6 +318,8 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 					
 					Logger.Warningf("changeDfProjectQuota (%s, %s, %s, %s) error: %s", 
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+					
+					return err
 				}
 			}
 
@@ -305,6 +331,8 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				
 				Logger.Warningf("createPersistentVolume (%s, %s, %s, %s) error: %s", 
 					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+				
+				return err
 			}
 
 		case PLanType_BSI:
@@ -315,13 +343,17 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				
 				Logger.Warningf("createBSI (%s, %s, %s, %s) error: %s", 
 					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
+
+				return err
 			}
 		}
+
+		return nil
 	}()
 
 	// ...
 
-	return paymentMoney, nil, false
+	return paymentMoney, finalErr, false
 }
 
 // PLanType_Volume

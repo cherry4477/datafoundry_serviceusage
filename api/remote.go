@@ -471,7 +471,8 @@ func (plan *Plan) ParsePlanBSI() (string, string, error) {
 		return "", "", fmt.Errorf("service name is blank")
 	}
 
-	planUUID := plan.Specification2
+	//planUUID := plan.Specification2
+	planUUID := plan.Plan_id
 	if planUUID == "" {
 		return "", "", fmt.Errorf("plan uuid is blank")
 	}
