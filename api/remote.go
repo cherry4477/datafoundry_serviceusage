@@ -555,7 +555,7 @@ func makePayment(region, accountId string, money float32, reason string) (error,
 		`{"namespace":"%s","amount":%.3f,"reason":"%s", "region":"%s"}`, 
 		accountId, money, reason, region, 
 		)
-	url := fmt.Sprintf("%s/charge/v1/recharge?type=deduction", RechargeSercice)
+	url := fmt.Sprintf("%s/charge/v1/recharge?type=deduction&region=%s", RechargeSercice, region)
 	
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {
