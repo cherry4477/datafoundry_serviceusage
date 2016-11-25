@@ -637,7 +637,7 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
 	}
 
-	url := fmt.Sprintf("http://%s/namespaces/%s/volumes", volumeService, project)
+	url := fmt.Sprintf("http://%s/lapi/v1/namespaces/%s/volumes", volumeService, project)
 
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {

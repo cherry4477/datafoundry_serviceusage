@@ -71,15 +71,25 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 			_, err, insufficientBalance := createOrder(false, db, nil, order, plan, nil)
 			if err != nil {
-				Logger.Warningf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
+				Logger.Errorf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
 
 				if insufficientBalance {
-					// expired?
-					if order.Deadline_time.Before(time.Now()) {
-						// todo: cancel order
-					} else {
+					if time.Now().Before(order.Deadline_time) {
+						
 						// todo: send warning email
+
+						continue
 					}
+
+					// so it is expired
+
+					// todo: cancel order
+
+					// zero quotas
+
+					// delete volume
+
+					// destroy bsi
 				}
 				
 				continue
@@ -90,7 +100,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 	// ...
 
 	if int(numAll) > len(orders) {
-		dur = time.Second
+		dur = 10 * time.Second
 		Logger.Debugf("TryToRenewConsumingOrders len(orders) == maxCount")
 	} else {
 		d, err := usage.GetDurationToRenewNextConsumingOrder(db, RenewMargin)
