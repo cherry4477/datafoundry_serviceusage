@@ -214,7 +214,19 @@ const (
 const ProjectCpuMemoryQuotaName = "standard-quota"
 const ProjectCpuMemoryLimitsName = "standard-limits"
 
-func changeDfProjectQuota(usernameForLog, region, project string, plan *Plan) error {
+
+
+func changeDfProjectQuotaWithPlan(usernameForLog, region, project string, plan *Plan) error {
+
+	cpus, mems, err := plan.ParsePlanQuotas()
+	if err != nil {
+		return err
+	}
+
+	return changeDfProjectQuota(usernameForLog, region, project, cpus, mems)
+}
+
+func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int) error {
 
 	oc := osAdminClients[region]
 	if oc == nil {
@@ -222,11 +234,6 @@ func changeDfProjectQuota(usernameForLog, region, project string, plan *Plan) er
 	}
 
 	// ...
-
-	cpus, mems, err := plan.ParsePlanQuotas()
-	if err != nil {
-		return err
-	}
 
 	const Mi = int64(1) << 20
 	const Gi = int64(1) << 30
@@ -655,15 +662,36 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 }
 
 func destroyPersistentVolume(volumeName, region, project string) error {
-	/*
-	oc := OC()
+	if Debug {
+		return nil
+	}
 
-	url := DfProxyApiPrefix() + "/namespaces/" + namespace + "/volumes/" + volumnName
-	
-	err := dfRequest("DELETE", url, oc.BearerToken(), nil, nil)
-	
-	return err
-	*/
+	// ...
+
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("destroyPersistentVolume: open shift client not found for region: %s", region)
+	}
+	adminToken := oc.BearerToken()
+
+	volumeService := VolumeServices[region]
+	if volumeService == "" {
+		return fmt.Errorf("destroyPersistentVolume: volumeService not found for region: %s", region)
+	}
+
+	url := fmt.Sprintf("http://%s/lapi/v1/namespaces/%s/volumes/%s", volumeService, project, volumeName)
+
+	response, data, err := common.RemoteCallWithJsonBody("DELETE", url, adminToken, "", nil)
+	if err != nil {
+		Logger.Infof("destroyPersistentVolume error: %s", err.Error())
+		return err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		Logger.Infof("destroyPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		return fmt.Errorf("destroyPersistentVolume remote (%s) status code: %d.", url, response.StatusCode)
+	}
+
 	return nil
 }
 
@@ -706,6 +734,10 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 }
 
 func destroyBSI(bsiName, region, project string) error {
+	if Debug {
+		return nil
+	}
+
 	// todo: unbind all and deprovision
 
 	return nil

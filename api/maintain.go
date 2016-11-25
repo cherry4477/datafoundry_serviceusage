@@ -36,7 +36,7 @@ func StartMaintaining() {
 // 2. try to renew them, 
 // 3. if balance is insufficient, send wanring emails.
 func TryToRenewConsumingOrders() (tm <- chan time.Time) {
-	dur := 3 * time.Minute
+	dur := 5 * time.Minute // default duration to invoke this function again.
 	defer func () {
 		tm = time.After(dur)
 	}()
@@ -53,12 +53,13 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 	const EndOrderMargin = 7 * 24 * time.Hour
 
-	onInsufficientBalance := func(order *usage.PurchaseOrder, plan *Plan) {
+	// return if the order is ended.
+	onInsufficientBalance := func(order *usage.PurchaseOrder, plan *Plan) bool {
 		if time.Now().Before(order.Deadline_time.Add(EndOrderMargin)) {
 			
 			// todo: send warning email
 
-			return
+			return false
 		}
 
 		// destroy ordered resources
@@ -66,31 +67,71 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 		switch plan.Plan_type {
 
 		case PLanType_Quotas:
-
-			// todo: zero quotas
+			// zero quotas
+			err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, 0, 0)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("onInsufficientBalance changeDfProjectQuota (%s, %s, %s, 0, 0) error: %s", 
+					order.Creator, order.Region, order.Account_id, err.Error())
+				
+				return false
+			}
 
 		case PLanType_Volume:
-
-			// todo: delete volume
+			// delete volume
+			err := destroyPersistentVolume(order.Resource_name, order.Region, order.Account_id)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("onInsufficientBalance destroyPersistentVolume (%s, %s, %s) error: %s", 
+					order.Resource_name, order.Region, order.Account_id, err.Error())
+				
+				return false
+			}
 
 		case PLanType_BSI:
+			// destroy bsi
+			err := destroyBSI(order.Resource_name, order.Region, order.Account_id)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("onInsufficientBalance destroyBSI (%s, %s, %s) error: %s", 
+					order.Resource_name, order.Region, order.Account_id, err.Error())
+				
+				return false
+			}
 
-			// todo: destroy bsi
 		}
 
 		// end order
 
-		//err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
-		//if err != nil {
-		//	return 0.0, fmt.Errorf("end expired order (%s) error: %s", lastConsume.Order_id, err.Error()), false
-		//}
+		lastConsume, err := usage.RetrieveConsumeHistory(db, order.Id, order.Order_id, order.Last_consume_id)
+		if err != nil {
+			Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s) error: %s", order.Id, err.Error())
+			return false
+		}
+
+		if lastConsume == nil {
+			Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s): lastConsume == nil", order.Id)
+			return false
+		}
+
+		err = usage.EndOrder(db, order, time.Now(), lastConsume, 0.0)
+		if err != nil {
+			return false
+		}
+
+		return true
 	}
 
 	// ...
 
 	const RenewMargin = 7 * 24 * time.Hour
 
+	// todo: use cursor instead
 	numAll, orders, err := usage.QueryConsumingOrdersToRenew(db, RenewMargin, 32)
+	_ = numAll
 	if err != nil {
 		Logger.Warningf("TryToRenewConsumingOrders at %s error: %s", time.Now().Format("2006-01-02 15:04:05.999999"), err.Error())
 	} else {
@@ -116,22 +157,27 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 				
 				continue
 			}
+
+			Logger.Infof("TryToRenewConsumingOrders createOrder (%s) succeeded.", order.Id)
 		}
 	}
 
 	// ...
 
-	if int(numAll) > len(orders) {
-		dur = 10 * time.Second
-		Logger.Debugf("TryToRenewConsumingOrders len(orders) == maxCount")
-	} else {
-		d, err := usage.GetDurationToRenewNextConsumingOrder(db, RenewMargin)
-		if err != nil {
-			Logger.Warningf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
-		} else {
-			dur = d
-		}
-	}
+	// todo: it is hard to calculate a proper duration to call this function again.
+	//       so used the default duration set at the beginning of this function now.
+
+	//if int(numAll) > len(orders) {
+	//	dur = 10 * time.Second
+	//	Logger.Debugf("TryToRenewConsumingOrders len(orders) == maxCount")
+	//} else {
+	//	d, err := usage.GetDurationToRenewNextConsumingOrder(db, RenewMargin)
+	//	if err != nil {
+	//		Logger.Warningf("TryToRenewConsumingOrders GetDurationToRenewNextConsumingOrder error: %s", err.Error())
+	//	} else {
+	//		dur = d
+	//	}
+	//}
 
 	return
 }
@@ -307,16 +353,18 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		switch plan.Plan_type {
 		default:
+			Logger.Warningf("createOrder, unknown plan type: %s", plan.Plan_type)
+			
 			return nil
 		case PLanType_Quotas:
 
 			switch consumExtraInfo {
 			case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
-				err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, plan)
+				err := changeDfProjectQuotaWithPlan(order.Creator, order.Region, order.Account_id, plan)
 				if err != nil {
 					// todo: retry
 					
-					Logger.Warningf("changeDfProjectQuota (%s, %s, %s, %s) error: %s", 
+					Logger.Warningf("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) error: %s", 
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 					
 					return err
