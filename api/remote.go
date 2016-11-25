@@ -696,7 +696,7 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 	}
 	uri := "/namespaces/"+project+"/backingserviceinstances"
 	osRest := openshift.NewOpenshiftREST(oc)
-	osRest.KPost(uri, &inputBSI, nil)
+	osRest.OPost(uri, &inputBSI, nil)
 	if osRest.Err != nil {
 		Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 		return osRest.Err
