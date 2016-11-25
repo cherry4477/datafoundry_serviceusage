@@ -466,7 +466,17 @@ func (plan *Plan) ParsePlanBSI() (string, string, error) {
 		return "", "", fmt.Errorf("not a bsi plan: %s", plan.Plan_type)
 	}
 
-	return "", "", fmt.Errorf("not implemented yet")
+	serviceName := plan.Specification1
+	if serviceName == "" {
+		return "", "", fmt.Errorf("service name is blank")
+	}
+
+	planUUID := plan.Specification2
+	if planUUID == "" {
+		return "", "", fmt.Errorf("plan uuid is blank")
+	}
+
+	return serviceName, planUUID, nil
 }
 
 type Plan struct {
