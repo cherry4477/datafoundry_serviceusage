@@ -140,6 +140,11 @@ func validateRegion(region string) (string, *Error) {
 	return region, e
 }
 
+func validatePlanType(planType string) (string, *Error) {
+	planType, e := _mustStringParam("plan-type", planType, 32, StringParamType_UrlWord)
+	return planType, e
+}
+
 const (
 	OrderStatusLabel_Pending   = "pending"
 	OrderStatusLabel_Consuming = "consuming"
@@ -613,6 +618,17 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
+	// ...
+
+	planType := r.FormValue("type")
+	if planType != "" {
+		planType, e = validatePlanType(r.FormValue("type"))
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+
 	// auth
 
 	username, e := validateAuth(region, r.Header.Get("Authorization"))
@@ -664,7 +680,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-	count, orders, err := usage.QueryOrders(db, accountId, region, status, renewalFailedOnly, offset, size)
+	count, orders, err := usage.QueryOrders(db, accountId, region, planType, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
