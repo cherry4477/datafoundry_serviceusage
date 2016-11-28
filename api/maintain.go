@@ -237,14 +237,6 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 			remaingMoney = 0.0
 
-			// try to end last order 
-			if ! drytry {
-				err := usage.EndOrder(db, oldOrder, now, lastConsume, 0.0)
-				if err != nil {
-					return 0.0, fmt.Errorf("end old order (%s) error: %s", lastConsume.Order_id, err.Error()), false
-				}
-			}
-
 			// create new 
 
 			paymentMoney = plan.Price
@@ -321,7 +313,8 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	// ...
 
-	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration)
+	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
+					plan.Price, plan.Id, consumExtraInfo)
 	if err != nil {
 		// todo: retry
 
@@ -329,19 +322,19 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		return paymentMoney, err, false
 	}
 
+	// CreateConsumeHistory has been merged into RenewOrder above
 	// ...
-
-	go func() {
-
-		// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
-		err = usage.CreateConsumeHistory(db, order, time.Now(), plan.Price, plan.Id, consumExtraInfo)
-		if err != nil {
-			// todo: retry
-
-			Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
-			//return paymentMoney, err, false
-		}
-	}()
+	//go func() {
+	//
+	//	// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
+	//	err = usage.CreateConsumeHistory(db, order, time.Now(), plan.Price, plan.Id, consumExtraInfo)
+	//	if err != nil {
+	//		// todo: retry
+	//
+	//		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
+	//		//return paymentMoney, err, false
+	//	}
+	//}()
 
 	// ...
 
