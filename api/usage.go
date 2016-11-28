@@ -497,15 +497,15 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	case "cancel":
 
-		oldOrderConsume, err := usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
-		if err != nil {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error() + " (old)"), nil)
-			return
-		}
+		//oldOrderConsume, err := usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
+		//if err != nil {
+		//	JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error() + " (old)"), nil)
+		//	return
+		//}
 
 		// todo: different plan types may need different handlings
 		// todo: now, withdraw is not supported
-		err = usage.EndOrder(db, oldOrder, time.Now(), oldOrderConsume, 0.0)
+		err = usage.EndOrder(db, oldOrder, time.Now(), /*oldOrderConsume,*/ 0.0)
 		if err != nil {
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
 			return

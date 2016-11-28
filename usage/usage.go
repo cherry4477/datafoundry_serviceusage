@@ -502,7 +502,7 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 	}()
 }
 
-func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsume *ConsumeHistory, remainingMoney float32) error {
+func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, /*lastConsume *ConsumeHistory,*/ remainingMoney float32) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -511,9 +511,34 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 	return func() error {
 		type db chan struct{} // avoid misuing db
 
+		order, err := RetrieveOrderByAutoGenID(tx, orderInfo.Id)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if order == nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) not found", orderInfo.Id)
+		}
+		if order.Status == OrderStatus_Ended {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) is already ended", orderInfo.Id)
+		}
 
+		// ...
 
+		lastConsume, err := RetrieveConsumeHistory(tx, orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) get last consume error: %s", orderInfo.Id, err.Error())
+		}
 		
+		if lastConsume == nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) last consume not found", orderInfo.Id)
+		}
+
+		// ...
 
 		endTimeStr := endTime.UTC().Format("2006-01-02 15:04:05.999999")
 
