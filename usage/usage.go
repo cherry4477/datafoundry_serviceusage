@@ -417,7 +417,8 @@ func GetDurationToRenewNextConsumingOrder(db *sql.DB, margin time.Duration) (tim
 	return d, nil
 }
 
-func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDuration time.Duration) (*PurchaseOrder, error) {
+func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDuration time.Duration,
+		consumeMoney float32, consumePlanHistoryId int64, consumeExtraInfo int) (*PurchaseOrder, error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return nil, err
@@ -480,6 +481,16 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 		//	return nil, fmt.Errorf("order (%s) not found", orderId)
 		//}
 
+		// create a consume history
+
+		err = createConsumeHistory(tx, order, time.Now(), lastConsumeId, consumeMoney, consumePlanHistoryId, consumeExtraInfo)
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
+		// commit
+
 		err = tx.Commit()
 		if err != nil {
 			return nil, err
@@ -491,7 +502,7 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 	}()
 }
 
-func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsume *ConsumeHistory, remainingMoney float32) error {
+func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, /*lastConsume *ConsumeHistory,*/ remainingMoney float32) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -499,6 +510,35 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 
 	return func() error {
 		type db chan struct{} // avoid misuing db
+
+		order, err := RetrieveOrderByAutoGenID(tx, orderInfo.Id)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+		if order == nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) not found", orderInfo.Id)
+		}
+		if order.Status == OrderStatus_Ended {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) is already ended", orderInfo.Id)
+		}
+
+		// ...
+
+		lastConsume, err := RetrieveConsumeHistory(tx, orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id)
+		if err != nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) get last consume error: %s", orderInfo.Id, err.Error())
+		}
+		
+		if lastConsume == nil {
+			tx.Rollback()
+			return fmt.Errorf("order (id=%d) last consume not found", orderInfo.Id)
+		}
+
+		// ...
 
 		endTimeStr := endTime.UTC().Format("2006-01-02 15:04:05.999999")
 
@@ -532,7 +572,7 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, lastConsu
 				orderInfo.Last_consume_id--
 			}
 
-			err := CreateConsumeHistory(tx, orderInfo, endTime, -remainingMoney, 
+			err := createConsumeHistory(tx, orderInfo, endTime, orderInfo.Last_consume_id, -remainingMoney, 
 							lastConsume.Plan_history_id, ConsumeExtraInfo_EndOrder)
 			if err != nil {
 				onFailed()
@@ -868,7 +908,7 @@ func consumePO2VO(consume *ConsumeHistory) {
 	consume.Deadline_time = consume.Deadline_time.Local()
 }
 
-func CreateConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.Time, money float32, planHistoryId int64, extraInfo int) error {
+func createConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.Time, lastConsumeId int, money float32, planHistoryId int64, extraInfo int) error {
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
@@ -882,7 +922,7 @@ func CreateConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.
 				'%s', '%s', '%s', %d,
 				%d
 				)`, 
-				orderInfo.Id, orderInfo.Order_id, orderInfo.Last_consume_id,
+				orderInfo.Id, orderInfo.Order_id, lastConsumeId,
 				consuming, consumeTime.UTC().Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, planHistoryId,
 				extraInfo,
