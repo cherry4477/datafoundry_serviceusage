@@ -70,7 +70,7 @@ func init() {
 	initError(ErrorCodeGetPlan, "failed to get plan")
 
 	initError(ErrorCodeInsufficentBalance, "insufficient balance")
-	initError(ErrorCodeChargedButFailedToCreateResource, "changed but failed to create resource")
+	initError(ErrorCodeChargedButFailedToCreateResource, "charged but failed to create resource")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)
