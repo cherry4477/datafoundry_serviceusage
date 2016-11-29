@@ -448,7 +448,8 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 		//	return fmt.Errorf("order (id=%s) not consumable", orderId)
 		//}
 
-		deadlineTime := extendTime(order.Deadline_time, extendedDuration, order.Start_time)
+		consumeTime := order.Deadline_time
+		deadlineTime := extendTime(consumeTime, extendedDuration, order.Start_time)
 		lastConsumeId := order.Last_consume_id + 1
 
 		onOk := func() { 
@@ -461,11 +462,11 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 
 		// todo: renewToTime should be larger than DEADLINE_TIME. Needed?
 
-		timestr := deadlineTime.UTC().Format("2006-01-02 15:04:05.999999")
+		deadlinetime_str := deadlineTime.UTC().Format("2006-01-02 15:04:05.999999")
 		sqlstr := fmt.Sprintf(`update DF_PURCHASE_ORDER set
 					DEADLINE_TIME='%s', LAST_CONSUME_ID=%d, EVER_PAYED=1, RENEW_RETRIES=0, STATUS=%d
 					where ID=%d`, 
-					timestr, lastConsumeId, OrderStatus_Consuming,
+					deadlinetime_str, lastConsumeId, OrderStatus_Consuming,
 					orderAutoGenId,
 					)
 
@@ -483,7 +484,7 @@ func RenewOrder(db *sql.DB, orderAutoGenId int64, lastConsumeId int, extendedDur
 
 		// create a consume history
 
-		err = createConsumeHistory(tx, order, time.Now(), lastConsumeId, consumeMoney, consumePlanHistoryId, consumeExtraInfo)
+		err = createConsumeHistory(tx, order, consumeTime, deadlineTime, lastConsumeId, consumeMoney, consumePlanHistoryId, consumeExtraInfo)
 		if err != nil {
 			tx.Rollback()
 			return nil, err
@@ -572,7 +573,7 @@ func EndOrder(db *sql.DB, orderInfo *PurchaseOrder, endTime time.Time, /*lastCon
 				orderInfo.Last_consume_id--
 			}
 
-			err := createConsumeHistory(tx, orderInfo, endTime, orderInfo.Last_consume_id, -remainingMoney, 
+			err := createConsumeHistory(tx, orderInfo, endTime, orderInfo.Deadline_time, orderInfo.Last_consume_id, -remainingMoney, 
 							lastConsume.Plan_history_id, ConsumeExtraInfo_EndOrder)
 			if err != nil {
 				onFailed()
@@ -908,7 +909,9 @@ func consumePO2VO(consume *ConsumeHistory) {
 	consume.Deadline_time = consume.Deadline_time.Local()
 }
 
-func createConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.Time, lastConsumeId int, money float32, planHistoryId int64, extraInfo int) error {
+func createConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, 
+			consumeTime time.Time, deadlineTime time.Time,
+			lastConsumeId int, money float32, planHistoryId int64, extraInfo int) error {
 	consuming := MoneyToConsuming(money)
 
 	sqlstr := fmt.Sprintf(`insert into DF_CONSUMING_HISTORY (
@@ -923,7 +926,7 @@ func createConsumeHistory(db DbOrTx, orderInfo *PurchaseOrder, consumeTime time.
 				%d
 				)`, 
 				orderInfo.Id, orderInfo.Order_id, lastConsumeId,
-				consuming, consumeTime.UTC().Format("2006-01-02 15:04:05.999999"), orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999"), 
+				consuming, consumeTime.UTC().Format("2006-01-02 15:04:05.999999"), deadlineTime.UTC().Format("2006-01-02 15:04:05.999999"), 
 				orderInfo.Account_id, orderInfo.Region, orderInfo.Plan_id, planHistoryId,
 				extraInfo,
 				)
