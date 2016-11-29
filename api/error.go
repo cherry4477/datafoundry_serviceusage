@@ -39,6 +39,8 @@ const (
 	ErrorCodeGetPlan               = 3315
 	ErrorCodeInsufficentBalance    = 3316 // DON'T CHAGNE	
 
+	ErrorCodeChargedButFailedToCreateResource = 3317 // DON'T CHAGNE	
+
 
 
 	NumErrors = 3500 // about 32k memroy wasted
@@ -68,6 +70,7 @@ func init() {
 	initError(ErrorCodeGetPlan, "failed to get plan")
 
 	initError(ErrorCodeInsufficentBalance, "insufficient balance")
+	initError(ErrorCodeChargedButFailedToCreateResource, "changed but failed to create resource")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)

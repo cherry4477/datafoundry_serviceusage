@@ -28,8 +28,8 @@ func StartMaintaining() {
 	}
 }
 
-// find all consuming orders need to renew,
-// 1. if ordre is expired, 
+// find all consuming orders need to renew (orders which will expire in RenewMargin),
+// 1. if ordre has bee expired for EndOrderMargin, 
 //    > change cpu/memory quotas to zero.
 //    > delete volume ...
 //    > delete bsi ...
@@ -147,11 +147,11 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 			// todo: if expired ... 
 
-			_, err, insufficientBalance := createOrder(false, db, nil, order, plan, nil)
+			_, err, errReason := createOrder(false, db, nil, order, plan, nil)
 			if err != nil {
 				Logger.Errorf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
 
-				if insufficientBalance {
+				if errReason == ErrorCodeInsufficentBalance {
 					onInsufficientBalance(order, plan)
 				}
 				
@@ -190,9 +190,9 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 	return fmt.Sprintf("order:%s:%d", orderId, renewTimes) // DON'T change
 }
 
-// createParams == nil for renew.
-// the return bool means insufficient balance or not
-func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, bool) {
+// createParams == nil means for renew.
+// the last return result means the exact error reason id. If its value <= 0, it will be ignored.
+func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, int) {
 
 	var err error
 	var lastConsume *usage.ConsumeHistory
@@ -202,11 +202,11 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		lastConsume, err = usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
 		if err != nil {
-			return 0.0, fmt.Errorf("Failed to switch plan: " + err.Error()), false
+			return 0.0, fmt.Errorf("Failed to switch plan: " + err.Error()), -1
 		}
 
 		if lastConsume == nil {
-			return 0.0, fmt.Errorf("Failed to switch plan: last payment not found"), false
+			return 0.0, fmt.Errorf("Failed to switch plan: last payment not found"), -1
 		}
 	}
 
@@ -231,7 +231,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		if now.Before(lastConsume.Consume_time) { // impossible
 
-			return 0.0, fmt.Errorf("last consume time is after now"), false
+			return 0.0, fmt.Errorf("last consume time is after now"), -1
 
 		} else if now.After(lastConsume.Deadline_time) {
 
@@ -257,7 +257,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 			if remaingMoney > plan.Price {
 
 				// todo: now, withdraw is not supported
-				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), false
+				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), -1
 			}
 
 			// ...
@@ -270,13 +270,13 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		if ! drytry {
 			err := usage.EndOrder(db, oldOrder, now, /*lastConsume,*/ remaingMoney)
 			if err != nil {
-				return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), false
+				return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
 			}
 		}
 	}
 
 	if drytry {
-		return paymentMoney, nil, false
+		return paymentMoney, nil, -1
 	}
 
 	// ...
@@ -285,7 +285,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	switch plan.Cycle {
 	default:
-		return paymentMoney, fmt.Errorf("unknown plan cycle: %s", plan.Cycle), false
+		return paymentMoney, fmt.Errorf("unknown plan cycle: %s", plan.Cycle), -1
 	case PLanCircle_Month:
 		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
@@ -297,13 +297,17 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		//err, insufficientBalance := makePayment(openshift.AdminToken(), order.Region, accountId, paymentMoney, paymentReason)
 		err, insufficientBalance := makePayment(order.Region, order.Account_id, paymentMoney, paymentReason)
-		if err != nil && insufficientBalance {
+		if err != nil {
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
 				Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
 			}
 
-			return 0.0, err, insufficientBalance
+			if insufficientBalance {
+				return 0.0, err, ErrorCodeInsufficentBalance
+			} else {
+				return 0.0, err, -1
+			}
 		}
 
 		// todo: looks this line is useless now. 
@@ -319,7 +323,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		// todo: retry
 
 		Logger.Warningf("RenewOrder error: %s", err.Error())
-		return paymentMoney, err, false
+		return paymentMoney, err, -1
 	}
 
 	// CreateConsumeHistory has been merged into RenewOrder above
@@ -339,16 +343,16 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 	// ...
 
 	//go 
-	finalErr := func() error {
+	finalErr, specialErrReason := func() (error, int) {
 		if createParams == nil { // 
-			return nil
+			return nil, 0
 		}
 
 		switch plan.Plan_type {
 		default:
 			Logger.Warningf("createOrder, unknown plan type: %s", plan.Plan_type)
 			
-			return nil
+			return nil, 0
 		case PLanType_Quotas:
 
 			switch consumExtraInfo {
@@ -360,7 +364,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 					Logger.Warningf("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) error: %s", 
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 					
-					return err
+					return err, ErrorCodeChargedButFailedToCreateResource
 				}
 			}
 
@@ -373,7 +377,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createPersistentVolume (%s, %s, %s, %s) error: %s", 
 					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 				
-				return err
+				return err, ErrorCodeChargedButFailedToCreateResource
 			}
 
 		case PLanType_BSI:
@@ -385,16 +389,16 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createBSI (%s, %s, %s, %s) error: %s", 
 					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 
-				return err
+				return err, ErrorCodeChargedButFailedToCreateResource
 			}
 		}
 
-		return nil
+		return nil, 0
 	}()
 
 	// ...
 
-	return paymentMoney, finalErr, false
+	return paymentMoney, finalErr, specialErrReason
 }
 
 // PLanType_Volume

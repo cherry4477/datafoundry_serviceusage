@@ -385,11 +385,11 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-	paymentMoney, err, insufficientBalance := createOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
+	paymentMoney, err, specialErrCode := createOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
 	if err != nil {
 		var errCode uint = ErrorCodeRenewOrder
-		if insufficientBalance {
-			errCode = ErrorCodeInsufficentBalance
+		if specialErrCode > 0 {
+			errCode = uint(specialErrCode)
 		}
 		JsonResult(w, http.StatusBadRequest, GetError2(errCode, err.Error()), nil)
 		return
