@@ -401,7 +401,7 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 				
 				fullUrl := uri + "/" + quota.Name
 				osRest = openshift.NewOpenshiftREST(oc)
-				osRest.KDelete(uri, nil)
+				osRest.KDelete(fullUrl, nil)
 				if osRest.Err != nil {
 					Logger.Warningf("delete quota (%s) error: %s", fullUrl, osRest.Err)
 				}
@@ -432,7 +432,7 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 				
 				fullUrl := uri + "/" + limit.Name
 				osRest = openshift.NewOpenshiftREST(oc)
-				osRest.KDelete(uri, nil)
+				osRest.KDelete(fullUrl, nil)
 				if osRest.Err != nil {
 					Logger.Warningf("delete limit (%s) error: %s", fullUrl, osRest.Err)
 				}
