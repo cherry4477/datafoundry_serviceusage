@@ -631,7 +631,7 @@ func RetrieveOrderByID(db DbOrTx, orderId, region string, status int) (*Purchase
 	return getSingleOrder(db, sqlWhere, sqlParams...)
 }
 
-func QueryOrders(db DbOrTx, accountId string, region, planType string, status int, renewalFailedOnly bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
+func QueryOrders(db DbOrTx, accountId string, region, resName, planType string, status int, renewalFailedOnly bool, offset int64, limit int) (int64, []*PurchaseOrder, error) {
 	sqlParams := make([]interface{}, 0, 4)
 	
 	// ...
@@ -660,6 +660,15 @@ func QueryOrders(db DbOrTx, accountId string, region, planType string, status in
 			sqlWhere = sqlWhere + fmt.Sprintf(" and REGION=?")
 		}
 		sqlParams = append(sqlParams, region)
+	}
+
+	if resName != "" {
+		if sqlWhere == "" {
+			sqlWhere = fmt.Sprintf("RESOURCE_NAME=?")
+		} else {
+			sqlWhere = sqlWhere + fmt.Sprintf(" and RESOURCE_NAME=?")
+		}
+		sqlParams = append(sqlParams, resName)
 	}
 
 	if planType != "" {

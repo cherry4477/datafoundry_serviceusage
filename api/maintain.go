@@ -57,70 +57,21 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 	onInsufficientBalance := func(order *usage.PurchaseOrder, plan *Plan) bool {
 		if time.Now().Before(order.Deadline_time.Add(EndOrderMargin)) {
 			
-			// todo: send warning email
+			// todo: most one notification per day
+
+			// SendBalanceInsufficientEmail(order, plan)
 
 			return false
 		}
 
-		// destroy ordered resources
-
-		switch plan.Plan_type {
-
-		case PLanType_Quotas:
-			// zero quotas
-			err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, 0, 0)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("onInsufficientBalance changeDfProjectQuota (%s, %s, %s, 0, 0) error: %s", 
-					order.Creator, order.Region, order.Account_id, err.Error())
-				
-				return false
-			}
-
-		case PLanType_Volume:
-			// delete volume
-			err := destroyPersistentVolume(order.Resource_name, order.Region, order.Account_id)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("onInsufficientBalance destroyPersistentVolume (%s, %s, %s) error: %s", 
-					order.Resource_name, order.Region, order.Account_id, err.Error())
-				
-				return false
-			}
-
-		case PLanType_BSI:
-			// destroy bsi
-			err := destroyBSI(order.Resource_name, order.Region, order.Account_id)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("onInsufficientBalance destroyBSI (%s, %s, %s) error: %s", 
-					order.Resource_name, order.Region, order.Account_id, err.Error())
-				
-				return false
-			}
-
-		}
-
-		// end order
-
-		//lastConsume, err := usage.RetrieveConsumeHistory(db, order.Id, order.Order_id, order.Last_consume_id)
-		//if err != nil {
-		//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s) error: %s", order.Id, err.Error())
-		//	return false
-		//}
-		//
-		//if lastConsume == nil {
-		//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s): lastConsume == nil", order.Id)
-		//	return false
-		//}
-
-		err := usage.EndOrder(db, order, time.Now(), /*lastConsume,*/ 0.0)
+		err := endOrder(db, order)
 		if err != nil {
+			Logger.Error(err.Error())
+				
 			return false
 		}
+
+		SendEndOrderEmail_BalanceInsufficient(order, plan)
 
 		return true
 	}
@@ -145,11 +96,9 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 				continue
 			}
 
-			// todo: if expired ... 
-
 			_, err, errReason := createOrder(false, db, nil, order, plan, nil)
 			if err != nil {
-				Logger.Errorf("TryToRenewConsumingOrders createOrder (%s) error: %s", order.Id, err.Error())
+				Logger.Errorf("TryToRenewConsumingOrders createOrder (%d) error: %s", order.Id, err.Error())
 
 				if errReason == ErrorCodeInsufficentBalance {
 					onInsufficientBalance(order, plan)
@@ -158,7 +107,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 				continue
 			}
 
-			Logger.Infof("TryToRenewConsumingOrders createOrder (%s) succeeded.", order.Id)
+			Logger.Infof("TryToRenewConsumingOrders createOrder (%d) succeeded.", order.Id)
 		}
 	}
 
@@ -327,7 +276,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 	}
 
 	// CreateConsumeHistory has been merged into RenewOrder above
-	// ...
+	// ... 
 	//go func() {
 	//
 	//	// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
@@ -340,7 +289,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 	//	}
 	//}()
 
-	// ...
+	// ... 
 
 	//go 
 	finalErr, specialErrReason := func() (error, int) {
@@ -401,56 +350,63 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 	return paymentMoney, finalErr, specialErrReason
 }
 
-// PLanType_Volume
 
-/*
-func renewOrder_old(accountId, orderId string, plan *Plan, renewReason string) error {
-	db := getDB()
-	if db == nil {
-		return fmt.Errorf("db not inited")
-	}
 
-	// ...
+func endOrder(db *sql.DB, order *usage.PurchaseOrder) error {
 
-	err := makePayment(openshift.AdminToken(), accountId, plan.Price, renewReason)
-	if err != nil {
-		err2 := usage.IncreaseOrderRenewalFails(db, orderId)
-		if err2 != nil {
-			Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
+	// destroy ordered resources
+
+	switch order.Plan_type {
+
+	case PLanType_Quotas:
+		// zero quotas
+		err := changeDfProjectQuota(order.Creator, order.Region, order.Account_id, 0, 0)
+		if err != nil {
+			// todo: retry
+			
+			return fmt.Errorf("onInsufficientBalance changeDfProjectQuota (%s, %s, %s, 0, 0) error: %s", 
+				order.Creator, order.Region, order.Account_id, err.Error())
 		}
 
-		return err
+	case PLanType_Volume:
+		// delete volume
+		err := destroyPersistentVolume(order.Resource_name, order.Region, order.Account_id)
+		if err != nil {
+			// todo: retry
+			
+			return fmt.Errorf("onInsufficientBalance destroyPersistentVolume (%s, %s, %s) error: %s", 
+				order.Resource_name, order.Region, order.Account_id, err.Error())
+		}
+
+	case PLanType_BSI:
+		// destroy bsi
+		err := destroyBSI(order.Resource_name, order.Region, order.Account_id)
+		if err != nil {
+			// todo: retry
+			
+			return fmt.Errorf("onInsufficientBalance destroyBSI (%s, %s, %s) error: %s", 
+				order.Resource_name, order.Region, order.Account_id, err.Error())
+		}
 	}
 
-	now := time.Now()
+	// end order
 
-	// change order status => consuming // will do in following renew calling
-	
-	var extendedDuration time.Duration
+	//lastConsume, err := usage.RetrieveConsumeHistory(db, order.Id, order.Order_id, order.Last_consume_id)
+	//if err != nil {
+	//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s) error: %s", order.Id, err.Error())
+	//	return false
+	//}
+	//
+	//if lastConsume == nil {
+	//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s): lastConsume == nil", order.Id)
+	//	return false
+	//}
 
-	switch plan.Cycle {
-	default:
-		return fmt.Errorf("unknown plan cycle: %s", plan.Cycle)
-	case PLanCircle_Month:
-		extendedDuration = usage.DeadlineExtendedDuration_Month
-	}
-
-	order, err := usage.RenewOrder(db, orderId, extendedDuration)
+	err := usage.EndOrder(db, order, time.Now(), /*lastConsume,*/ 0.0)
 	if err != nil {
-		// todo: retry
-
-		Logger.Warningf("RenewOrder error: %s", err.Error())
-		return err
-	}
-
-	err = usage.CreateConsumeHistory(db, order, now, plan.Price, plan.Id)
-	if err != nil {
-		// todo: retry
-
-		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
-		return err
+		return fmt.Errorf("onInsufficientBalance EndOrder (%s, %s, %s) error: %s", 
+			order.Resource_name, order.Region, order.Account_id, err.Error())
 	}
 
 	return nil
 }
-*/

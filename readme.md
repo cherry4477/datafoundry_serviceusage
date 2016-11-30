@@ -51,6 +51,7 @@ data.order.start_time
 data.order.endTime: 只有订单已经被终止的时候存在
 data.order.status: "pending" | "consuming" | "ended"。
 data.order.creator
+data.order.resource_name: 订单对应的资源名称，并非所有订单都此字段。对于volume，其为volume_name；对于bsi，其为bsi_name。
 ```
 
 ### PUT /usageapi/v1/orders/{order_id}
@@ -104,7 +105,7 @@ data.order.status: "pending" | "consuming" | "ended"
 data.order.creator
 ```
 
-### GET /usageapi/v1/orders?namespace={namespace}&status={status}&region={region}&page={page}&size={size}
+### GET /usageapi/v1/orders?namespace={namespace}&status={status}&region={region}&resource_name={resource_name}&page={page}&size={size}
 
 用户查询订单列表
 
@@ -113,6 +114,7 @@ Query Parameters:
 namespace: 可省略，默认为当前用户名称。
 status: 订单状态。"consuming" | "ended" | "renewalfailed"。可以缺省，表示consuming。
 region: 区标识，不可缺省。
+resource_name: 资源名，可以省略。一般指定此字段是为了根据resource_name找到订单号。
 page: 第几页。可选。最小值为1。默认为1。
 size: 每页最多返回多少条数据。可选。最小为1，最大为100。默认为30。
 ```
@@ -168,46 +170,7 @@ data.results[0].plan_id
 
 ## 数据库设计
 
-订单：
-```
-CREATE TABLE IF NOT EXISTS DF_PURCHASE_ORDER
-(
-   ID                 BIGINT NOT NULL AUTO_INCREMENT,
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'may be project',
-   REGION             VARCHAR(32) NOT NULL COMMENT 'for query',
-   PLAN_ID            VARCHAR(64) NOT NULL,
-   PLAN_TYPE          VARCHAR(2) NOT NULL COMMENT 'for query',
-   START_TIME         DATETIME,
-   END_TIME           DATETIME COMMENT 'invalid when status is consuming',
-   DEADLINE_TIME      DATETIME COMMENT 'time to terminate order',
-   LAST_CONSUME_ID    INT DEFAULT 0 COMMENT 'charging times',
-   EVER_PAYED         TINYINT DEFAULT 0 COMMENT 'LAST_CONSUME_ID > 0',
-   RENEW_RETRIES      TINYINT DEFAULT 0 COMMENT 'num renew fails, most 100',
-   STATUS             TINYINT NOT NULL COMMENT 'pending, consuming, ending, ended',
-   CREATOR            VARCHAR(64) NOT NULL COMMENT 'who made this order',
-   PRIMARY KEY (ID)
-)  DEFAULT CHARSET=UTF8;
-```
-
-消费报表：
-```
-CREATE TABLE IF NOT EXISTS DF_CONSUMING_HISTORY
-(
-   ID                 BIGINT NOT NULL COMMENT 'copied from DF_PURCHASE_ORDER.ID',
-   ORDER_ID           VARCHAR(64) NOT NULL,
-   CONSUME_ID         INT,
-   CONSUMING          BIGINT NOT NULL COMMENT 'scaled by 10000',
-   CONSUME_TIME       DATETIME,
-   DEADLINE_TIME      DATETIME,
-   ACCOUNT_ID         VARCHAR(64) NOT NULL COMMENT 'for query',
-   REGION             VARCHAR(32) NOT NULL COMMENT 'for query',
-   PLAN_ID            VARCHAR(64) NOT NULL COMMENT 'for query',
-   PLAN_HISTORY_ID    BIGINT NOT NULL COMMENT 'auto gen id, important to retrieve history plan',
-   EXTRA_INFO         INT COMMENT 'one bit for: new|renew|switch',
-   PRIMARY KEY (ID, ORDER_ID, CONSUME_ID)
-)  DEFAULT CHARSET=UTF8;
-```
+see `_db/initdb_v001.sql`
 
 ## 部署
 

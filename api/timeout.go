@@ -43,7 +43,7 @@ func TimeoutHandleWithMessage(h httprouter.Handle, dt time.Duration, msg string)
 				tw.w.Write(body)
 			}
 			tw.timedOut = true
-			log.DefaultLogger().Warningf("timeout: %s", r.URL.String())
+			log.DefaultLogger().Warningf("timeout (%s): %s", dt, r.URL.String())
 		}
 	}
 }

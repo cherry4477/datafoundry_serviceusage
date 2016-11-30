@@ -30,7 +30,7 @@ const (
 	ErrorCodePermissionDenied      = 3306
 	ErrorCodeInvalidParameters     = 3307
 	ErrorCodeCreateOrder           = 3308
-	ErrorCodeDeleteOrder           = 3309
+	ErrorCodeCancelOrder           = 3309
 	ErrorCodeModifyOrder           = 3310
 	ErrorCodeGetOrder              = 3311
 	ErrorCodeQueryOrders           = 3312
@@ -59,7 +59,7 @@ func init() {
 	initError(ErrorCodeInvalidParameters, "invalid parameters")
 
 	initError(ErrorCodeCreateOrder, "failed to create order")
-	initError(ErrorCodeDeleteOrder, "failed to delete order")
+	initError(ErrorCodeCancelOrder, "failed to delete order")
 	initError(ErrorCodeModifyOrder, "failed to modify order")
 	initError(ErrorCodeGetOrder, "failed to retrieve order")
 	initError(ErrorCodeQueryOrders, "failed to query orders")
