@@ -16,6 +16,10 @@ So it is best to avoid $#& in tag name.
 
 // todo: move following GetXxxKey functions into individual projects
 
+func GetGeneralStatKey(words ...string) string {
+	return strings.Join(words, "/")
+}
+
 func GetVersionKey(words ...string) string {
 	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "version")
 }
@@ -23,66 +27,6 @@ func GetVersionKey(words ...string) string {
 func GetPhaseKey(words ...string) string {
 	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "phase")
 }
-
-func GetGeneralStatKey(words ...string) string {
-	return strings.Join(words, "/")
-}
-
-func GetSubscriptionsStatKey(words ...string) string {
-	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "subs")
-}
-
-func GetSubscriptionPlanSigningTimesStatKey(words ...string) string { // params should be (repoName, itemName, planId string)
-	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "sgns")
-}
-
-func GetTransactionsStatKey(words ...string) string {
-	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "txns")
-}
-
-func GetStarsStatKey(words ...string) string {
-	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "strs")
-}
-
-func GetCommentsStatKey(words ...string) string {
-	return fmt.Sprintf("%s%s%s", GetGeneralStatKey(words...), "#", "cmts")
-}
-
-// item doesn't mean data item. It means any objects.
-
-func GetUserItemStatKey(username string, itemStatKey string) string {
-	return fmt.Sprintf("%s$%s", username, itemStatKey)
-}
-
-func GetUserSubscriptionPlanSigningTimesStatKey(userName, repoName, itemName, planId string) string {
-	return GetUserItemStatKey(userName, GetSubscriptionPlanSigningTimesStatKey(repoName, itemName, planId))
-}
-
-// user stats
-func GetUserSubscriptionsStatKey(username string) string {
-	return fmt.Sprintf("%s$#%s", username, "subs")
-}
-
-func GetUserTransactionsStatKey(username string) string {
-	return fmt.Sprintf("%s$#%s", username, "txns")
-}
-
-func GetUserStarsStatKey(username string) string {
-	return fmt.Sprintf("%s$#%s", username, "strs")
-}
-
-func GetUserCommentsStatKey(username string) string {
-	return fmt.Sprintf("%s$#%s", username, "cmts")
-}
-
-// the following 2 will be removed
-// it should be >$#
-//func GetDateStatsStatKey(date time.Time) string {
-//	return fmt.Sprintf("%s>%s", date.Format("2006-01-02"), "subs")
-//}
-//func GetDateTransactionsStatKey(date time.Time) string {
-//	return fmt.Sprintf("%s>%s", date.Format("2006-01-02"), "txns")
-//}
 
 //==========================================================
 //

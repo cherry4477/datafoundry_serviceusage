@@ -306,10 +306,10 @@ func (osr *OpenshiftREST) doRequest(method, url string, bodyParams interface{}, 
 	//res, osr.Err := oc.request(method, url, body, GeneralRequestTimeout) // non-name error
 	res, err := osr.oc.request(method, url, body, GeneralRequestTimeout)
 	osr.Err = err
-	osr.StatusCode = res.StatusCode
 	if osr.Err != nil {
 		return osr
 	}
+	osr.StatusCode = res.StatusCode
 	defer res.Body.Close()
 
 	var data []byte

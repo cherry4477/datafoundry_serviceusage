@@ -397,6 +397,12 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
+	if ! drytry {
+		SendCreateOrderEmail(order, plan)
+	}
+
+	// ...
+
 	result := struct {
 		Money string               `json:"money,omitempty"`
 		Order *usage.PurchaseOrder `json:"order,omitempty"`
@@ -497,22 +503,21 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	case "cancel":
 
-		//oldOrderConsume, err := usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id)
-		//if err != nil {
-		//	JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryConsumings, err.Error() + " (old)"), nil)
-		//	return
-		//}
-
-		// todo: different plan types may need different handlings
-		// todo: now, withdraw is not supported
-		err = usage.EndOrder(db, oldOrder, time.Now(), /*oldOrderConsume,*/ 0.0)
+		err = endOrder(db, oldOrder)
 		if err != nil {
-			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeModifyOrder, err.Error()), nil)
+			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeCancelOrder, err.Error()), nil)
 			return
 		}
 
-		// todo: modify quota to zero
+		go func() {
+			plan, err := getPlanByID(oldOrder.Plan_id)
+			if err != nil {
+				Logger.Errorf("cancel order (%d) getPlanByID (%s) error: %s", oldOrder.Id, oldOrder.Plan_id, err.Error())
+				return
+			}
 
+			SendEndOrderEmail_CancelledManually(oldOrder, plan)
+		}()
 	}
 
 	JsonResult(w, http.StatusOK, nil, nil)
@@ -618,6 +623,15 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 		return
 	}
 
+	resName := r.FormValue("resource_name")
+	if resName != "" {
+		e = validateDfResName(resName)
+		if e != nil {
+			JsonResult(w, http.StatusBadRequest, e, nil)
+			return
+		}
+	}
+
 	// ...
 
 	planType := r.FormValue("type")
@@ -680,7 +694,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
 
-	count, orders, err := usage.QueryOrders(db, accountId, region, planType, status, renewalFailedOnly, offset, size)
+	count, orders, err := usage.QueryOrders(db, accountId, region, resName, planType, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
