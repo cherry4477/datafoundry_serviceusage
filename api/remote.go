@@ -378,6 +378,68 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 		}
 	}
 
+	// remove all quotas other than ProjectCpuMemoryQuotaName
+	go func() {
+		uri := namespaceUri + "/resourcequotas"
+
+		quotaList := struct{
+			Items []kapi.ResourceQuota `json:"items,omitempty"`
+		}{
+			[]kapi.ResourceQuota {},
+		}
+
+		osRest := openshift.NewOpenshiftREST(oc)
+
+		osRest.KGet(uri, &quotaList)
+		if osRest.Err != nil {
+			Logger.Warningf("list quotas (%s) error: %s", uri, osRest.Err)
+		} else {
+			for _, quota := range quotaList.Items {
+				if quota.Name == "" || quota.Name == ProjectCpuMemoryQuotaName {
+					continue
+				}
+				
+				fullUrl := uri + "/" + quota.Name
+				osRest = openshift.NewOpenshiftREST(oc)
+				osRest.KDelete(fullUrl, nil)
+				if osRest.Err != nil {
+					Logger.Warningf("delete quota (%s) error: %s", fullUrl, osRest.Err)
+				}
+			}
+		}
+	}()
+
+	// remove all limits other than ProjectCpuMemoryLimitsName
+	go func() {
+		uri := namespaceUri + "/limitranges"
+
+		limitList := struct{
+			Items []kapi.LimitRange `json:"items,omitempty"`
+		}{
+			[]kapi.LimitRange {},
+		}
+
+		osRest := openshift.NewOpenshiftREST(oc)
+
+		osRest.KGet(uri, &limitList)
+		if osRest.Err != nil {
+			Logger.Warningf("list limits (%s) error: %s", uri, osRest.Err)
+		} else {
+			for _, limit := range limitList.Items {
+				if limit.Name == "" || limit.Name == ProjectCpuMemoryLimitsName{
+					continue
+				}
+				
+				fullUrl := uri + "/" + limit.Name
+				osRest = openshift.NewOpenshiftREST(oc)
+				osRest.KDelete(fullUrl, nil)
+				if osRest.Err != nil {
+					Logger.Warningf("delete limit (%s) error: %s", fullUrl, osRest.Err)
+				}
+			}
+		}
+	}()
+
 	return nil
 }
 
