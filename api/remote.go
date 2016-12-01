@@ -39,9 +39,10 @@ var (
 	osAdminClients map[string]*openshift.OpenshiftClient // region -> client
 	VolumeServices map[string]string                     // region -> service
 
-	PaymentService  string
-	PlanService     string
-	RechargeSercice string
+	PaymentService     string
+	PlanService        string
+	RechargeSercice    string
+	SendMessageService string
 )
 
 func BuildDataFoundryClient(infoEnv string, durPhase time.Duration) (*openshift.OpenshiftClient, string) {
@@ -96,10 +97,11 @@ func initGateWay() {
 	// ...
 
 	// ...
-
 	PaymentService = BuildServiceUrlPrefixFromEnv("PaymentService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPAYMENT_SERVICE_PORT")))
 	PlanService = BuildServiceUrlPrefixFromEnv("PlanService", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYPLAN_SERVICE_PORT")))
 	RechargeSercice = BuildServiceUrlPrefixFromEnv("ChargeSercice", false, os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_HOST")), os.Getenv(os.Getenv("ENV_NAME_DATAFOUNDRYRECHARGE_SERVICE_PORT")))
+	SendMessageService = BuildServiceUrlPrefixFromEnv("SendMessageService", false, os.Getenv("SENDMESSAGE_SERVICE_ADDR"), "")
+
 }
 
 //================================================================
@@ -439,7 +441,7 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 			}
 		}
 	}()
-
+ 
 	return nil
 }
 
