@@ -56,10 +56,23 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 	// return if the order is ended.
 	onInsufficientBalance := func(order *usage.PurchaseOrder, plan *Plan) bool {
 		if time.Now().Before(order.Deadline_time.Add(EndOrderMargin)) {
-			
-			// todo: most one notification per day
 
-			// SendBalanceInsufficientEmail(order, plan)
+			t, err := usage.GetOrderLastWarningMessageTime(db, order.Id)
+			if err != nil {
+				Logger.Errorf("onInsufficientBalance GetOrderLastWarningMessageTime error: %s\n", err.Error())
+				return false
+			}
+
+			now := time.Now()
+			if now.Sub(t) < 24 * time.Hour {
+				// send most one email per day
+				return false
+			}
+
+			// todo: need a return error
+			SendBalanceInsufficientEmail(order, plan)
+			
+			usage.SetOrderLastWarningMessageTime(db, order.Id, now)
 
 			return false
 		}
