@@ -535,7 +535,7 @@ func (plan *Plan) ParsePlanBSI() (string, string, error) {
 		return "", "", fmt.Errorf("not a bsi plan: %s", plan.Plan_type)
 	}
 
-	serviceName := plan.Specification1
+	serviceName := plan.Belong
 	if serviceName == "" {
 		return "", "", fmt.Errorf("service name is blank")
 	}
@@ -555,6 +555,7 @@ type Plan struct {
 	Plan_name       string    `json:"plan_name,omitempty"`
 	Plan_type       string    `json:"plan_type,omitempty"`
 	Plan_level      int       `json:"plan_level,omitempty"`
+	Belong          string    `json:"belong,omitempty"`
 	Specification1  string    `json:"specification1,omitempty"`
 	Specification2  string    `json:"specification2,omitempty"`
 	Price           float32   `json:"price,omitempty"`
