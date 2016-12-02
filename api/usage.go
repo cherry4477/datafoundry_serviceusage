@@ -458,7 +458,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		return
 	}
 	if oldOrder == nil {
-		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetOrder, "not found"), nil)
+		JsonResult(w, http.StatusBadRequest, GetError(ErrorCodeOrderNotFound), nil)
 		return
 	}
 
@@ -484,6 +484,11 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
 		}
+	}
+
+	if oldOrder.Account_id != accountId {
+		JsonResult(w, http.StatusBadRequest, GetError(ErrorCodePermissionDenied), nil)
+		return
 	}
 
 	// check if user can manipulate project or not
@@ -572,6 +577,11 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 				JsonResult(w, http.StatusBadRequest, e, nil)
 				return
 			}
+		}
+
+		if order.Account_id != accountId {
+			JsonResult(w, http.StatusBadRequest, GetError(ErrorCodePermissionDenied), nil)
+			return
 		}
 		
 		if accountId != username {
