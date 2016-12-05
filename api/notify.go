@@ -25,6 +25,7 @@ type MessageOrEmail struct {
 	Order  *usage.PurchaseOrder `json:order,omitempty`
 	Plan   *Plan                `json:plan,omitempty`
 }
+
 func SendEmailOrMessage(order *usage.PurchaseOrder, plan *Plan, reason string) {
 	if Debug {
 		return
@@ -56,20 +57,20 @@ func SendEmailOrMessage(order *usage.PurchaseOrder, plan *Plan, reason string) {
 	}
 }
 func SendCreateOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
-	SendEmailOrMessage(order,plan,"order_created")
+	SendEmailOrMessage(order, plan, "order_created")
 }
 
 // warning balance insufficient
 func SendBalanceInsufficientEmail(order *usage.PurchaseOrder, plan *Plan) {
-	SendEmailOrMessage(order,plan,"order_renew_failed")
+	SendEmailOrMessage(order, plan, "order_renew_failed")
 }
 
 // order is ended for insufficient balance
 func SendEndOrderEmail_BalanceInsufficient(order *usage.PurchaseOrder, plan *Plan) {
-	SendEmailOrMessage(order,plan,"order_closed")
+	SendEmailOrMessage(order, plan, "order_closed")
 }
 
 // order is cancelled by project owner self
 func SendEndOrderEmail_CancelledManually(order *usage.PurchaseOrder, plan *Plan) {
-	SendEmailOrMessage(order,plan,"order_cancled")
+	SendEmailOrMessage(order, plan, "order_cancled")
 }
