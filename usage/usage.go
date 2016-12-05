@@ -9,7 +9,7 @@ import (
 	"strings"
 	//"io/ioutil"
 	//"path/filepath"s
-	//stat "github.com/asiainfoLDP/datafoundry_serviceusage/statistics"
+	stat "github.com/asiainfoLDP/datafoundry_serviceusage/statistics"
 	//"github.com/asiainfoLDP/datahub_commons/log"
 )
 
@@ -1089,3 +1089,33 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 
 	return consumings, nil
 }
+
+//==================================================================
+// stat
+//==================================================================
+
+//>> don't change these values
+var WarningMessageSendBaseTime = time.Date(2010, 1, 1, 0, 0, 0, 0, nil)
+
+func BuildOrderLastWarningMessageTimeKey(orderKey int64) string {
+	return fmt.Sprintf("order-warning-time$%d", orderKey)
+}
+//<<
+
+func GetOrderLastWarningMessageTime(db *sql.DB, orderKey int64) (time.Time, error) {
+	statKey := BuildOrderLastWarningMessageTimeKey(orderKey)
+	hours, err := stat.RetrieveStat(db, statKey)
+	if err != nil {
+		return WarningMessageSendBaseTime, nil
+	}
+
+	return WarningMessageSendBaseTime.Add(time.Duration(hours) * time.Hour), nil
+}
+
+func SetOrderLastWarningMessageTime(db *sql.DB, orderKey int64, t time.Time) error {
+	statKey := BuildOrderLastWarningMessageTimeKey(orderKey)
+	hours := t.Sub(WarningMessageSendBaseTime) / time.Hour
+	_, err := stat.SetStat(db, statKey, int(hours))
+	return err
+}
+
