@@ -68,8 +68,8 @@ func SendBalanceInsufficientEmail(order *usage.PurchaseOrder, plan *Plan) {
 			return
 		}
 	    message := MessageOrEmail{
-	 		Reason: "order_field",
-			Order: order,
+	 		Reason: "order_renew_failed",
+			Order: order, 
 			Plan: plan,
 	    }
 		url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
@@ -100,7 +100,9 @@ func SendEndOrderEmail_BalanceInsufficient(order *usage.PurchaseOrder, plan *Pla
 			return
 		}
 	    message := MessageOrEmail{
-	 		Reason: "order will fall due",
+	 		Reason: "order_closed",
+			Order: order, 
+			Plan: plan,
 	    }
 		url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
 		data, err := json.Marshal(message)
@@ -130,7 +132,7 @@ func SendEndOrderEmail_CancelledManually(order *usage.PurchaseOrder, plan *Plan)
 			return
 		}
 	    message := MessageOrEmail{
-	 		Reason: "Successful cancellation of the order",
+	 		Reason: "order_cancled",
 			Order: order,
 			Plan: plan,
 	    }
