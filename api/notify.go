@@ -25,130 +25,51 @@ type MessageOrEmail struct {
 	Order  *usage.PurchaseOrder `json:order,omitempty`
 	Plan   *Plan                `json:plan,omitempty`
 }
-
-func SendCreateOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
+func SendEmailOrMessage(order *usage.PurchaseOrder, plan *Plan, reason string) {
 	if Debug {
 		return
 	}
 	oc := osAdminClients[order.Region]
 	if oc == nil {
-		Logger.Errorf("SendCreateOrderEmail getadmin token \n")
+		Logger.Errorf("SendEmailOrMessage %s getadmin token \n", reason)
 		return
 	}
 	message := MessageOrEmail{
-		Reason: "order_created",
+		Reason: reason,
 		Order:  order,
 		Plan:   plan,
 	}
 	url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
 	data, err := json.Marshal(message)
 	if err != nil {
-		Logger.Errorf("SendCreateOrderEmail Marshal error: %s\n", err.Error())
+		Logger.Errorf("SendEmailOrMessage %s Marshal error: %s\n", reason, err.Error())
 		return
 	}
 	response, _, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
 	if err != nil {
-		Logger.Errorf("SendCreateOrderEmail error: %s", err.Error())
+		Logger.Errorf("SendEmailOrMessage %s error: %s", reason, err.Error())
 		return
 	}
 	if response.StatusCode != http.StatusOK {
-		Logger.Errorf("SendCreateOrderEmail remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		Logger.Errorf("SendEmailOrMessage %s remote (%s) status code: %d. data=%s", reason, url, response.StatusCode, string(data))
 		return
 	}
+}
+func SendCreateOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
+	SendEmailOrMessage(order,plan,"order_created")
 }
 
 // warning balance insufficient
 func SendBalanceInsufficientEmail(order *usage.PurchaseOrder, plan *Plan) {
-	if Debug {
-		return
-	}
-	oc := osAdminClients[order.Region]
-	if oc == nil {
-		Logger.Errorf("SendBalanceInsufficientEmail getadmin token \n")
-		return
-	}
-	message := MessageOrEmail{
-		Reason: "order_renew_failed",
-		Order:  order,
-		Plan:   plan,
-	}
-	url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
-	data, err := json.Marshal(message)
-	if err != nil {
-		Logger.Errorf("SendBalanceInsufficientEmail Marshal error: %s\n", err.Error())
-		return
-	}
-	response, _, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
-	if err != nil {
-		Logger.Errorf("SendBalanceInsufficientEmail error: %s", err.Error())
-		return
-	}
-	if response.StatusCode != http.StatusOK {
-		Logger.Errorf("SendBalanceInsufficientEmail remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return
-	}
+	SendEmailOrMessage(order,plan,"order_renew_failed")
 }
 
 // order is ended for insufficient balance
 func SendEndOrderEmail_BalanceInsufficient(order *usage.PurchaseOrder, plan *Plan) {
-	if Debug {
-		return
-	}
-	oc := osAdminClients[order.Region]
-	if oc == nil {
-		Logger.Errorf("SendEndOrderEmail_BalanceInsufficient getadmin token \n")
-		return
-	}
-	message := MessageOrEmail{
-		Reason: "order_closed",
-		Order:  order,
-		Plan:   plan,
-	}
-	url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
-	data, err := json.Marshal(message)
-	if err != nil {
-		Logger.Errorf("SendEndOrderEmail_BalanceInsufficient Marshal error: %s\n", err.Error())
-		return
-	}
-	response, _, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
-	if err != nil {
-		Logger.Errorf("SendEndOrderEmail_BalanceInsufficient error: %s", err.Error())
-		return
-	}
-	if response.StatusCode != http.StatusOK {
-		Logger.Errorf("SendEndOrderEmail_BalanceInsufficient remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return
-	}
+	SendEmailOrMessage(order,plan,"order_closed")
 }
 
 // order is cancelled by project owner self
 func SendEndOrderEmail_CancelledManually(order *usage.PurchaseOrder, plan *Plan) {
-	if Debug {
-		return
-	}
-	oc := osAdminClients[order.Region]
-	if oc == nil {
-		Logger.Errorf("SendEndOrderEmail_CancelledManually getadmin token \n")
-		return
-	}
-	message := MessageOrEmail{
-		Reason: "order_cancled",
-		Order:  order,
-		Plan:   plan,
-	}
-	url := fmt.Sprintf("%s/lapi/inbox?type=orderevent", SendMessageService)
-	data, err := json.Marshal(message)
-	if err != nil {
-		Logger.Errorf("SendEndOrderEmail_CancelledManually Marshal error: %s\n", err.Error())
-		return
-	}
-	response, _, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
-	if err != nil {
-		Logger.Errorf("SendEndOrderEmail_CancelledManually error: %s", err.Error())
-		return
-	}
-	if response.StatusCode != http.StatusOK {
-		Logger.Errorf("SendEndOrderEmail_CancelledManually remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
-		return
-	}
+	SendEmailOrMessage(order,plan,"order_cancled")
 }
