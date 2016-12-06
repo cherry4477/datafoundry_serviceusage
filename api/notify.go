@@ -55,6 +55,7 @@ func SendEmailOrMessage(order *usage.PurchaseOrder, plan *Plan, reason string) {
 		Logger.Errorf("SendEmailOrMessage %s remote (%s) status code: %d. data=%s", reason, url, response.StatusCode, string(data))
 		return
 	}
+		Logger.Error("SendEmailOrMessage is success")
 }
 func SendCreateOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
 	SendEmailOrMessage(order, plan, "order_created")
