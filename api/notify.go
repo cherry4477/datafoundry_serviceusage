@@ -46,13 +46,13 @@ func SendEmailOrMessage(order *usage.PurchaseOrder, plan *Plan, reason string) {
 		Logger.Errorf("SendEmailOrMessage %s Marshal error: %s\n", reason, err.Error())
 		return
 	}
-	response, _, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
+	response, response_data, err := common.RemoteCallWithJsonBody("POST", url, oc.BearerToken(), "", data)
 	if err != nil {
 		Logger.Errorf("SendEmailOrMessage %s error: %s", reason, err.Error())
 		return
 	}
 	if response.StatusCode != http.StatusOK {
-		Logger.Errorf("SendEmailOrMessage %s remote (%s) status code: %d. data=%s", reason, url, response.StatusCode, string(data))
+		Logger.Errorf("SendEmailOrMessage %s remote (%s) status code: %d. data=%s", reason, url, response.StatusCode, string(response_data))
 		return
 	}
 		Logger.Error("SendEmailOrMessage is success")
