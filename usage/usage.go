@@ -1095,7 +1095,7 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 //==================================================================
 
 //>> don't change these values
-var WarningMessageSendBaseTime = time.Date(2010, 1, 1, 0, 0, 0, 0, nil)
+var WarningMessageSendBaseTime = time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func BuildOrderLastWarningMessageTimeKey(orderKey int64) string {
 	return fmt.Sprintf("order-warning-time$%d", orderKey)
