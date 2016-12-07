@@ -112,7 +112,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 		} else {
 			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and RESOURCE_NAME=? and STATUS=?")
 			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Resource_name, OrderStatus_Consuming}
-			count, err := queryOrdersCount(tx, sqlWhere, params)
+			count, err := queryOrdersCount(tx, sqlWhere, params...)
 			if err != nil {
 				tx.Rollback()
 				return 0, err
