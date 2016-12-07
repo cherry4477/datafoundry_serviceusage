@@ -101,6 +101,11 @@ func validateDfResName(resName string) *Error {
 	if openshift.IsDNS1123Label(resName) {
 		return nil
 	}
+
+	n := len(resName)
+	if n < 4 || n > 30 {
+		return newInvalidParameterError("invalid df res name length")
+	}
 	
 	return newInvalidParameterError(fmt.Sprintf("%s is not a legal df res name", resName))
 }
