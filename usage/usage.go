@@ -2,7 +2,7 @@ package usage
 
 import (
 	"database/sql"
-	//"errors"
+	"errors"
 	"fmt"
 	"time"
 	//"bytes"
@@ -92,6 +92,12 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 		}
 	}
 	*/
+
+	const MinSameOrderingInterval = 15 * time.Second
+	oldOrder, _ := RetrieveOrderByID(db, orderInfo.Order_id, orderInfo.Region, -1)
+	if oldOrder != nil && orderInfo.Start_time.Sub(oldOrder.Start_time) < MinSameOrderingInterval {
+		return 0, errors.New("too frequently")
+	}
 
 	startTime := orderInfo.Start_time.UTC().Format("2006-01-02 15:04:05.999999")
 	endTime := orderInfo.End_time.UTC().Format("2006-01-02 15:04:05.999999")

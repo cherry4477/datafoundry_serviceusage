@@ -121,6 +121,8 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 			}
 
 			Logger.Infof("TryToRenewConsumingOrders createOrder (%d) succeeded.", order.Id)
+
+			SendRenewOrderEmail(order, plan)
 		}
 	}
 
@@ -353,6 +355,9 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 				return err, ErrorCodeChargedButFailedToCreateResource
 			}
+
+			Logger.Infof("createBSI (%s, %s, %s, %s) succeeded", 
+					order.Creator, order.Region, order.Account_id, plan.Plan_id)
 		}
 
 		return nil, 0
