@@ -62,6 +62,11 @@ func SendCreateOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
 }
 
 // warning balance insufficient
+func SendRenewOrderEmail(order *usage.PurchaseOrder, plan *Plan) {
+	SendEmailOrMessage(order, plan, "order_renewed")
+}
+
+// warning balance insufficient
 func SendBalanceInsufficientEmail(order *usage.PurchaseOrder, plan *Plan) {
 	SendEmailOrMessage(order, plan, "order_renew_failed")
 }
