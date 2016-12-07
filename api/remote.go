@@ -786,11 +786,6 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.OGet(uri, nil)
-		if osRest.Err != nil {
-			Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
-			return osRest.Err
-		}
-		
 		if osRest.StatusCode != http.StatusNotFound {
 			Logger.Infof("createBSI, region(%s), uri(%s) error: already exist", region, uri)
 			return fmt.Errorf("bsi %s already exists", bsiName)
