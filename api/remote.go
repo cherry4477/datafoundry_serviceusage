@@ -776,23 +776,46 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 		return err
 	}
 
-	// ...
+	// get bsi
 
-	inputBSI := backingserviceinstanceapi.BackingServiceInstance {}
-	inputBSI.Name = bsiName
-	inputBSI.Spec.BackingServiceName =serviceName
-	inputBSI.Spec.BackingServicePlanGuid = servicePlanUUID
-
-	oc := osAdminClients[region]
-	if oc == nil {
-		return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
+	{
+		oc := osAdminClients[region]
+		if oc == nil {
+			return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
+		}
+		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
+		osRest := openshift.NewOpenshiftREST(oc)
+		osRest.OGet(uri, nil)
+		if osRest.Err != nil {
+			Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			return osRest.Err
+		}
+		
+		if osRest.StatusCode != http.StatusNotFound {
+			Logger.Infof("createBSI, region(%s), uri(%s) error: already exist", region, uri)
+			return fmt.Errorf("bsi %s already exists", bsiName)
+		}
 	}
-	uri := "/namespaces/"+project+"/backingserviceinstances"
-	osRest := openshift.NewOpenshiftREST(oc)
-	osRest.OPost(uri, &inputBSI, nil)
-	if osRest.Err != nil {
-		Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
-		return osRest.Err
+
+	// create bsi
+
+	{
+		inputBSI := backingserviceinstanceapi.BackingServiceInstance {}
+		inputBSI.Name = bsiName
+		inputBSI.Spec.BackingServiceName =serviceName
+		inputBSI.Spec.BackingServicePlanGuid = servicePlanUUID
+
+		oc := osAdminClients[region]
+		if oc == nil {
+			return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
+		}
+		uri := "/namespaces/"+project+"/backingserviceinstances"
+		osRest := openshift.NewOpenshiftREST(oc)
+		osRest.OPost(uri, &inputBSI, nil)
+		if osRest.Err != nil {
+			Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			return osRest.Err
+		}
 	}
 
 	return nil

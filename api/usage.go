@@ -97,14 +97,16 @@ func validateOrderMode(modeName string) (int, *Error) {
 
 
 
-func validateDfResName(resName string) *Error {
+func validateDfResName(resName string, checkLength bool) *Error {
 	if openshift.IsDNS1123Label(resName) {
 		return nil
 	}
 
-	n := len(resName)
-	if n < 4 || n > 30 {
-		return newInvalidParameterError("invalid df res name length")
+	if checkLength {
+		n := len(resName)
+		if n < 4 || n > 30 {
+			return newInvalidParameterError("invalid df res name length")
+		}
 	}
 	
 	return newInvalidParameterError(fmt.Sprintf("%s is not a legal df res name", resName))
@@ -280,7 +282,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// ...
 
 	if orderCreation.Params.ResName != "" {
-		e = validateDfResName(orderCreation.Params.ResName)
+		e = validateDfResName(orderCreation.Params.ResName, true)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
@@ -640,7 +642,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	resName := r.FormValue("resource_name")
 	if resName != "" {
-		e = validateDfResName(resName)
+		e = validateDfResName(resName, false)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
