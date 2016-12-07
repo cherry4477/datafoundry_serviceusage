@@ -93,43 +93,74 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 	}
 	*/
 
-	const MinSameOrderingInterval = 15 * time.Second
-	oldOrder, _ := RetrieveOrderByID(db, orderInfo.Order_id, orderInfo.Region, -1)
-	if oldOrder != nil && orderInfo.Start_time.Sub(oldOrder.Start_time) < MinSameOrderingInterval {
-		return 0, errors.New("too frequently")
-	}
-
-	startTime := orderInfo.Start_time.UTC().Format("2006-01-02 15:04:05.999999")
-	endTime := orderInfo.End_time.UTC().Format("2006-01-02 15:04:05.999999")
-	consumeTime := orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999")
-	sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
-				ORDER_ID,
-				ACCOUNT_ID, REGION, 
-				PLAN_ID, PLAN_TYPE, 
-				START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
-				CREATOR, STATUS, RESOURCE_NAME,
-				RENEW_RETRIES
-				) values (
-				?, 
-				?, ?, 
-				?, ?, 
-				'%s', '%s', '%s', 0, 0,
-				?, ?, ?,
-				0
-				)`, 
-				startTime, endTime, consumeTime,
-				)
-	result, err := db.Exec(sqlstr,
-				orderInfo.Order_id, 
-				orderInfo.Account_id, orderInfo.Region,  
-				orderInfo.Plan_id, orderInfo.Plan_type, 
-				orderInfo.Creator, orderInfo.Status, orderInfo.Resource_name, 
-				)
+	tx, err := db.Begin()
 	if err != nil {
 		return 0, err
 	}
+	
+	return func() (int64, error) {
 
-	return result.LastInsertId()
+		type db chan struct{} // avoid misuing db
+
+		if orderInfo.Resource_name == "" {
+			const MinSameOrderingInterval = 15 * time.Second
+			oldOrder, _ := RetrieveOrderByID(tx, orderInfo.Order_id, orderInfo.Region, -1)
+			if oldOrder != nil && orderInfo.Start_time.Sub(oldOrder.Start_time) < MinSameOrderingInterval {
+				tx.Rollback()
+				return 0, errors.New("too frequently")
+			}
+		} else {
+			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and RESOURCE_NAME=? and STATUS=?")
+			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Resource_name, OrderStatus_Consuming}
+			count, err := queryOrdersCount(tx, sqlWhere, params)
+			if err != nil {
+				tx.Rollback()
+				return 0, err
+			}
+			if count > 0 {
+				tx.Rollback()
+				return 0, errors.New("duplicated resource name")
+			}
+		}
+
+		startTime := orderInfo.Start_time.UTC().Format("2006-01-02 15:04:05.999999")
+		endTime := orderInfo.End_time.UTC().Format("2006-01-02 15:04:05.999999")
+		consumeTime := orderInfo.Deadline_time.UTC().Format("2006-01-02 15:04:05.999999")
+		sqlstr := fmt.Sprintf(`insert into DF_PURCHASE_ORDER (
+					ORDER_ID,
+					ACCOUNT_ID, REGION, 
+					PLAN_ID, PLAN_TYPE, 
+					START_TIME, END_TIME, DEADLINE_TIME, LAST_CONSUME_ID, EVER_PAYED,
+					CREATOR, STATUS, RESOURCE_NAME,
+					RENEW_RETRIES
+					) values (
+					?, 
+					?, ?, 
+					?, ?, 
+					'%s', '%s', '%s', 0, 0,
+					?, ?, ?,
+					0
+					)`, 
+					startTime, endTime, consumeTime,
+					)
+		result, err := tx.Exec(sqlstr,
+					orderInfo.Order_id, 
+					orderInfo.Account_id, orderInfo.Region,  
+					orderInfo.Plan_id, orderInfo.Plan_type, 
+					orderInfo.Creator, orderInfo.Status, orderInfo.Resource_name, 
+					)
+		if err != nil {
+			tx.Rollback()
+			return 0, err
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return 0, err
+		}
+
+		return result.LastInsertId()
+	}()
 }
 
 func RemoveOrder(db *sql.DB, orderId string) error {
