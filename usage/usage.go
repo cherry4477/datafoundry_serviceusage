@@ -94,7 +94,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 	*/
 
 	const MinSameOrderingInterval = 15 * time.Second
-	oldOrder, err := RetrieveOrderByID(db, orderInfo.Order_id, orderInfo.Region, -1)
+	oldOrder, _ := RetrieveOrderByID(db, orderInfo.Order_id, orderInfo.Region, -1)
 	if oldOrder != nil && orderInfo.Start_time.Sub(oldOrder.Start_time) < MinSameOrderingInterval {
 		return 0, errors.New("too frequently")
 	}
