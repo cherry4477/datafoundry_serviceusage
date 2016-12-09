@@ -258,13 +258,20 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// ...
 
+	planRegion := r.FormValue("region")
+	planRegion, e := validateRegion(planRegion)
+	if e != nil {
+		JsonResult(w, http.StatusBadRequest, e, nil)
+		return
+	}
+
 	planId, e := validatePlanID(orderCreation.PlanID)
 	if e != nil {
 		JsonResult(w, http.StatusBadRequest, e, nil)
 		return
 	}
 
-	plan, err := getPlanByID(planId)
+	plan, err := getPlanByID(planId, planRegion)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, err.Error()), nil)
 		return
@@ -272,7 +279,19 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// assert planId == plan.Plan_id 
 	planType := plan.Plan_type
-	planRegion := plan.Region
+	//planRegion := plan.Region
+
+	// todo: switch 
+	//>>
+	if plan.Region != planRegion {
+		Logger.Warning("region not match",planRegion, plan.Region,plan.Id)
+		plan.Region = planRegion
+	}
+	//<<
+	//if plan.Region != planRegion {
+	//	JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeGetPlan, "plan regions not match"), nil)
+	//	return
+	//}
 
 	if ! isValidPlanType(planType) {
 		JsonResult(w, http.StatusBadRequest, newInvalidParameterError("plan type is invalid"), nil)
@@ -522,7 +541,7 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 
 		go func() {
-			plan, err := getPlanByID(oldOrder.Plan_id)
+			plan, err := getPlanByID(oldOrder.Plan_id, oldOrder.Region)
 			if err != nil {
 				Logger.Errorf("cancel order (%d) getPlanByID (%s) error: %s", oldOrder.Id, oldOrder.Plan_id, err.Error())
 				return
