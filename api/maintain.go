@@ -103,7 +103,7 @@ func TryToRenewConsumingOrders() (tm <- chan time.Time) {
 
 		for _, order := range orders {
 			// 
-			plan, err := getPlanByID(order.Plan_id)
+			plan, err := getPlanByID(order.Plan_id, order.Region)
 			if err != nil {
 				Logger.Errorf("TryToRenewConsumingOrders getPlanByID (%s) error: %s", order.Plan_id, err.Error())
 				continue

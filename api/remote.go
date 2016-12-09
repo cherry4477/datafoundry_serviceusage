@@ -569,7 +569,7 @@ type Plan struct {
 }
 
 // todo: add historyId to retrieve history info?
-func getPlanByID(planId string) (*Plan, error) {
+func getPlanByID(planId, planRegion string) (*Plan, error) {
 	if Debug {
 		return &Plan{
 			Id: 123,
@@ -584,7 +584,7 @@ func getPlanByID(planId string) (*Plan, error) {
 		}, nil
 	}
 
-	url := fmt.Sprintf("%s/charge/v1/plans/%s", PlanService, planId)
+	url := fmt.Sprintf("%s/charge/v1/plans/%s?region=%s", PlanService, planId, planRegion)
 	
 	response, data, err := common.RemoteCall("GET", url, "", "")
 	if err != nil {
