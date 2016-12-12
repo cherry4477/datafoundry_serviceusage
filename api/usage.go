@@ -97,7 +97,11 @@ func validateOrderMode(modeName string) (int, *Error) {
 
 
 
-func validateDfResName(resName string, checkLength bool) *Error {
+func validateDfResName(planType, resName string, checkLength bool) *Error {
+	if shouldResNameBeBlank(planType) && len(resName) > 0 {
+		return newInvalidParameterError("resource_name should be blank: " + resName)
+	}
+
 	if openshift.IsDNS1123Label(resName) {
 		return nil
 	}
@@ -301,7 +305,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// ...
 
 	if orderCreation.Params.ResName != "" {
-		e = validateDfResName(orderCreation.Params.ResName, true)
+		e = validateDfResName(planType, orderCreation.Params.ResName, true)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return
@@ -661,7 +665,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	resName := r.FormValue("resource_name")
 	if resName != "" {
-		e = validateDfResName(resName, false)
+		e = validateDfResName("", resName, false)
 		if e != nil {
 			JsonResult(w, http.StatusBadRequest, e, nil)
 			return

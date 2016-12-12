@@ -474,6 +474,10 @@ func isValidPlanType(planType string) bool {
 	return false
 }
 
+func shouldResNameBeBlank(planType string) bool {
+	return planType == PLanType_Quotas
+}
+
 // for quotas plans, specification1 stores the cpu cores, specification2 stores the memory size
 func (plan *Plan) ParsePlanQuotas() (int, int, error) {
 	//"specification1": "16 CPU Cores",
