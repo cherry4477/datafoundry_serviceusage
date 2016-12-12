@@ -176,6 +176,8 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	// if old order exists, end it.
 	// its remaining money will apply on the new order.
+	
+	var remaingMoney float32
 
 	var consumExtraInfo int
 	var paymentMoney float32
@@ -190,7 +192,6 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		}
 	} else {
 
-		var remaingMoney float32
 		now := time.Now()
 
 		if now.Before(lastConsume.Consume_time) { // impossible
@@ -231,12 +232,13 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		}
 
 		// try to end last order 
-		if ! drytry {
-			err := usage.EndOrder(db, oldOrder, now, /*lastConsume,*/ remaingMoney)
-			if err != nil {
-				return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
-			}
-		}
+		// (now moved after payment)
+		//if ! drytry {
+		//	err := usage.EndOrder(db, oldOrder, now, /*lastConsume,*/ remaingMoney)
+		//	if err != nil {
+		//		return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
+		//	}
+		//}
 	}
 
 	if drytry {
@@ -288,6 +290,14 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		Logger.Warningf("RenewOrder error: %s", err.Error())
 		return paymentMoney, err, -1
+	}
+
+	// 
+	if lastConsume == nil {
+		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
+		if err != nil {
+			return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
+		}
 	}
 
 	// CreateConsumeHistory has been merged into RenewOrder above
