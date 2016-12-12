@@ -119,7 +119,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 			}
 			if count > 0 {
 				tx.Rollback()
-				return 0, errors.New("duplicated resource name")
+				return 0, errors.New("duplicated resource name: " + orderInfo.Resource_name)
 			}
 		}
 
