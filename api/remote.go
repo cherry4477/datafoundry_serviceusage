@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 	"strings"
-	//"errors"
+	"errors"
 	"strconv"
 
 	"github.com/asiainfoLDP/datahub_commons/common"
@@ -18,6 +18,7 @@ import (
 	projectapi "github.com/openshift/origin/pkg/project/api/v1"
 	backingserviceinstanceapi "github.com/openshift/origin/pkg/backingserviceinstance/api/v1"
 	kapi "k8s.io/kubernetes/pkg/api/v1"
+	//"k8s.io/kubernetes/pkg/api/unversioned"
 	kapiresource "k8s.io/kubernetes/pkg/api/resource"
 )
 
@@ -752,12 +753,12 @@ func destroyPersistentVolume(volumeName, region, project string) error {
 
 	response, data, err := common.RemoteCallWithJsonBody("DELETE", url, adminToken, "", nil)
 	if err != nil {
-		Logger.Infof("destroyPersistentVolume error: %s", err.Error())
+		Logger.Errorf("destroyPersistentVolume error: %s", err.Error())
 		return err
 	}
 
 	if response.StatusCode != http.StatusOK {
-		Logger.Infof("destroyPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		Logger.Errorf("destroyPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
 		return fmt.Errorf("destroyPersistentVolume remote (%s) status code: %d.", url, response.StatusCode)
 	}
 
@@ -780,19 +781,21 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 		return err
 	}
 
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
+	}
+
 	// get bsi
 
 	{
-		oc := osAdminClients[region]
-		if oc == nil {
-			return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
-		}
+		
 		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.OGet(uri, nil)
 		if osRest.StatusCode != http.StatusNotFound {
-			Logger.Infof("createBSI, region(%s), uri(%s) error: already exist", region, uri)
-			return fmt.Errorf("bsi %s already exists", bsiName)
+			Logger.Errorf("region(%s), uri(%s) error: already exist", region, uri)
+			return fmt.Errorf("createBSI: destroyBSIbsi %s already exists", bsiName)
 		}
 	}
 
@@ -804,15 +807,11 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 		inputBSI.Spec.BackingServiceName =serviceName
 		inputBSI.Spec.BackingServicePlanGuid = servicePlanUUID
 
-		oc := osAdminClients[region]
-		if oc == nil {
-			return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
-		}
 		uri := "/namespaces/"+project+"/backingserviceinstances"
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.OPost(uri, &inputBSI, nil)
 		if osRest.Err != nil {
-			Logger.Infof("createBSI, region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
 	}
@@ -825,10 +824,152 @@ func destroyBSI(bsiName, region, project string) error {
 		return nil
 	}
 
-	// todo: unbind all and deprovision
+	oc := osAdminClients[region]
+	if oc == nil {
+		return fmt.Errorf("destroyBSI: open shift client not found for region: %s", region)
+	}
+
+	// get bsi
+	theBSI := backingserviceinstanceapi.BackingServiceInstance {}
+	{
+		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
+		osRest := openshift.NewOpenshiftREST(oc)
+		osRest.OGet(uri, &theBSI)
+		if osRest.Err != nil {
+			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			return osRest.Err
+		}
+	}
+
+	// unbind bsi
+	for i := range theBSI.Spec.Binding	{
+		binding := &theBSI.Spec.Binding[i]
+
+		bro := backingserviceinstanceapi.NewBindingRequestOptions(
+			backingserviceinstanceapi.BindKind_DeploymentConfig,
+			"v1",
+			binding.BindDeploymentConfig,
+		)
+		bro.Name = bsiName
+		bro.Namespace = project
+
+		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName+"/binding"
+		osRest := openshift.NewOpenshiftREST(oc)
+		osRest.OPut(uri, &bro, nil)
+		if osRest.Err != nil {
+			// todo: maybe retry?
+			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			return osRest.Err
+		}
+	}
+
+	// wait bsi.status to unbound
+	func() error {
+		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
+		statuses, cancel, err := oc.KWatch(uri)
+		if err != nil {
+			Logger.Errorf("region(%s), uri(%s) KWatch error: %s", region, uri, err)
+			return err
+		}
+		defer close(cancel)
+
+		getBsiChan := make(chan *backingserviceinstanceapi.BackingServiceInstance, 1)
+		go func() {
+			// the bsi may be already unbound initially.
+			// so simulate this get request result as a new watch event.
+
+			select {
+			case <-time.After(5 * time.Second):
+				bsi := &backingserviceinstanceapi.BackingServiceInstance{}
+				osr := openshift.NewOpenshiftREST(oc).KGet(uri, bsi)
+				//fmt.Println("WaitUntilBsiIsUnbound, get bsi, osr.Err=", osr.Err)
+				if osr.Err == nil {
+					getBsiChan <- bsi
+				} else {
+					Logger.Errorf("region(%s), uri(%s) KWatch get bsi error: %s", region, uri, osr.Err)
+					getBsiChan <- nil
+				}
+			}
+		}()
+
+		type watchBsiStatus struct {
+			// The type of watch update contained in the message
+			Type string `json:"type"`
+			// Pod details
+			Object backingserviceinstanceapi.BackingServiceInstance `json:"object"`
+		}
+
+		// avoid waiting too long time
+		timer := time.NewTimer(3 * time.Hour)
+		defer timer.Stop()
+
+		for {
+			var bsi *backingserviceinstanceapi.BackingServiceInstance
+			select {
+			case <- timer.C:
+				Logger.Errorf("region(%s), uri(%s) KWatch bsi is expired", region, uri)
+				return fmt.Errorf("region(%s), uri(%s) KWatch bsi is expired", region, uri)
+			case bsi = <-getBsiChan:
+			case status, _ := <-statuses:
+				if status.Err != nil {
+					return status.Err
+				}
+
+				var wbs watchBsiStatus
+				if err := json.Unmarshal(status.Info, &wbs); err != nil {
+					Logger.Errorf("region(%s), uri(%s) KWatch bsi Unmarshal error: %s", region, uri, err)
+					return fmt.Errorf("region(%s), uri(%s) KWatch bsi Unmarshal error: %s", region, uri, err)
+				}
+
+				bsi = &wbs.Object
+			}
+
+			if bsi == nil {
+				// get return 404 from above goroutine
+				return errors.New("bsi not found")
+			}
+
+			// assert bsi != nil
+
+			//fmt.Println("WaitUntilBsiIsUnbound, bsi.Phase=", bsi.Status.Phase, ", bsi=", *bsi)
+
+			if bsi.Status.Phase == backingserviceinstanceapi.BackingServiceInstancePhaseUnbound {
+				Logger.Infof("region(%s), uri(%s) KWatch bsi is unbound now", region, uri)
+				break
+			}
+		}
+
+		return nil
+	}()
+
+	// delete bsi
+	delF := func() error {
+		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
+		osRest := openshift.NewOpenshiftREST(oc)
+		osRest.ODelete(uri, nil)
+		if osRest.Err != nil {
+			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
+			return osRest.Err
+		}
+		return nil
+	}
+	{
+		err := delF()
+		if err != nil {
+			return err
+		}
+		// may need to delete twice
+		time.Sleep(10 * time.Second)
+		delF()
+		if err != nil {
+			// return err // need?
+		}
+	}
 
 	return nil
 }
 
 
 
+
+	

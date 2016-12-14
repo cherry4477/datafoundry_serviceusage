@@ -283,6 +283,15 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	// ...
 
+	if lastConsume != nil {
+		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
+		if err != nil {
+			return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
+		}
+	}
+
+	// ...
+
 	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
 					plan.Price, plan.Id, consumExtraInfo)
 	if err != nil {
@@ -290,14 +299,6 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		Logger.Warningf("RenewOrder error: %s", err.Error())
 		return paymentMoney, err, -1
-	}
-
-	// 
-	if lastConsume != nil {
-		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
-		if err != nil {
-			return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
-		}
 	}
 
 	// CreateConsumeHistory has been merged into RenewOrder above
