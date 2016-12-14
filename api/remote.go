@@ -824,6 +824,7 @@ func destroyBSI(bsiName, region, project string) error {
 		return nil
 	}
 
+RETRY:
 	oc := osAdminClients[region]
 	if oc == nil {
 		return fmt.Errorf("destroyBSI: open shift client not found for region: %s", region)
@@ -839,6 +840,10 @@ func destroyBSI(bsiName, region, project string) error {
 			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
+	}
+
+	if len(theBSI.Spec.Binding) == 0 {
+		goto DELETE
 	}
 
 	// unbind bsi
@@ -864,7 +869,7 @@ func destroyBSI(bsiName, region, project string) error {
 	}
 
 	// wait bsi.status to unbound
-	func() error {
+	if func() error {
 		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
 		statuses, cancel, err := oc.KWatch(uri)
 		if err != nil {
@@ -940,8 +945,11 @@ func destroyBSI(bsiName, region, project string) error {
 		}
 
 		return nil
-	}()
+	}() == nil {
+		goto RETRY // maybe some dcs are just bound in waiting 
+	}
 
+DELETE:
 	// delete bsi
 	delF := func() error {
 		uri := "/namespaces/"+project+"/backingserviceinstances/"+bsiName
