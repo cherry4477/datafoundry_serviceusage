@@ -905,7 +905,7 @@ RETRY:
 		}
 
 		// avoid waiting too long time
-		timer := time.NewTimer(3 * time.Hour)
+		timer := time.NewTimer(15 * time.Minute)
 		defer timer.Stop()
 
 		for {
