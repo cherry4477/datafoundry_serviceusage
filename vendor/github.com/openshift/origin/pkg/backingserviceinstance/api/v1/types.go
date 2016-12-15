@@ -173,3 +173,11 @@ type BindingRequestOptions struct {
 	ResourceName string `json:"resourceName, omitempty"`
 
 }
+
+func NewBindingRequestOptions(kind, version, name string) *BindingRequestOptions {
+	return &BindingRequestOptions{
+		BindKind:            kind,
+		BindResourceVersion: version,
+		ResourceName:        name,
+	}
+}
