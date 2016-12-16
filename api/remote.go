@@ -338,8 +338,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 						kapi.ResourceMemory: memQuantity_ContainerMin,
 					},
 				Default: kapi.ResourceList{
-						kapi.ResourceCPU:    cpuQuantity_ContainerDefault,
-						kapi.ResourceMemory: memQuantity_ContainerDefault,
+						kapi.ResourceCPU:    cpuQuantity, //cpuQuantity_ContainerDefault,
+						kapi.ResourceMemory: memQuantity, //memQuantity_ContainerDefault,
 					},
 				DefaultRequest: kapi.ResourceList{
 						kapi.ResourceCPU:    cpuQuantity_ContainerDefault,
