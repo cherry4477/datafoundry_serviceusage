@@ -9,6 +9,10 @@ type Error struct {
 	message string
 }
 
+func (e Error) Error() string {
+	return fmt.Sprintf("[%d]: %s", e.code, e.message)
+}
+
 var (
 	Errors            [NumErrors]*Error
 	ErrorNone         *Error
