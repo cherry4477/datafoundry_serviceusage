@@ -417,8 +417,11 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
+Logger.Warning("000000")
+
 	paymentMoney, err, specialErrCode := createOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
 	if err != nil {
+Logger.Warning("000000 aaaaa")
 		var errCode uint = ErrorCodeRenewOrder
 		if specialErrCode > 0 {
 			errCode = uint(specialErrCode)
@@ -426,6 +429,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		JsonResult(w, http.StatusBadRequest, GetError2(errCode, err.Error()), nil)
 		return
 	}
+Logger.Warning("9999999")
 
 	// ...
 
