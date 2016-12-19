@@ -643,6 +643,8 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
+Logger.Warning("aaaaaaaaa")
+
 	// ...
 
 	db := getDB()
@@ -690,6 +692,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	}
 
 	// auth
+Logger.Warning("bbbbbbbbbb")
 
 	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
@@ -739,19 +742,19 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
-
+Logger.Warning("ccccccccccc")
 	count, orders, err := usage.QueryOrders(db, accountId, region, resName, planType, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
 	}
-
+Logger.Warning("hhhhhhhhhhh")
 	for _, o := range orders {
 		o.StatusLabel = orderStatusToLabel(o.Status)
 	}
 
 	// ...
-
+Logger.Warning("iiiiiiiiiiii")
 	type NamedOrder struct {
 		Order *usage.PurchaseOrder `json:"order,omitempty"`
 	}
@@ -759,6 +762,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	for i, o := range orders {
 		result[i].Order = o
 	}
+Logger.Warning("jjjjjjjjjj")
 
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, result))
 }
