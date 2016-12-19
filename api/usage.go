@@ -316,6 +316,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	username, e := validateAuth(planRegion, r.Header.Get("Authorization"))
 	if e != nil {
+		Logger.Warning("validateAuth err", r.Header.Get("Authorization"), ",", planRegion, plan.Region,plan.Id, e)
+
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
