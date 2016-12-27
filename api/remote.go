@@ -824,6 +824,8 @@ func destroyBSI(bsiName, region, project string) error {
 		return nil
 	}
 
+	retryOnFailedToDelete := true
+
 RETRY:
 	oc := osAdminClients[region]
 	if oc == nil {
@@ -837,6 +839,10 @@ RETRY:
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.OGet(uri, &theBSI)
 		if osRest.Err != nil {
+			if osRest.StatusCode == http.StatusNotFound {
+				return nil
+			}
+
 			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
@@ -956,6 +962,10 @@ DELETE:
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.ODelete(uri, nil)
 		if osRest.Err != nil {
+			if osRest.StatusCode == http.StatusNotFound {
+				return nil
+			}
+
 			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
@@ -964,14 +974,31 @@ DELETE:
 	{
 		err := delF()
 		if err != nil {
-			return err
+			if retryOnFailedToDelete {
+				retryOnFailedToDelete = false
+				goto RETRY
+			} else {
+				return err
+			}
 		}
-		// may need to delete twice
-		time.Sleep(10 * time.Second)
-		delF()
-		if err != nil {
-			// return err // need?
-		}
+
+		go func() {
+			// may need to delete twice
+			time.Sleep(5 * time.Second)
+			err := delF()
+			if err != nil {
+				//if retryOnFailedToDelete {
+				//	retryOnFailedToDelete = false
+				//	goto RETRY
+				//} else {
+				//	return err
+				//}
+				Logger.Errorf("region(%s), uri(%s) error: %s", 
+					region, 
+					"/namespaces/"+project+"/backingserviceinstances/"+bsiName, 
+					err)
+			}
+		}()
 	}
 
 	return nil

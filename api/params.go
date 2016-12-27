@@ -58,6 +58,7 @@ func initRouter(router *httprouter.Router) {
 	//router.PUT("/usageapi/v1/orders/:order_id", TimeoutHandle(5000*time.Millisecond, ModifyOrder))
 	//router.GET("/usageapi/v1/orders/:order_id", TimeoutHandle(4600*time.Millisecond, GetAccountOrder))
 	router.PUT("/usageapi/v1/orders/:id", TimeoutHandle(60000*time.Millisecond, ModifyOrder))
+			// timeout for the above api should be larger than 15 seconds, for delete bsi need some time to be done.
 	router.GET("/usageapi/v1/orders/:id", TimeoutHandle(60000*time.Millisecond, GetAccountOrder))
 	router.GET("/usageapi/v1/orders", TimeoutHandle(60000*time.Millisecond, QueryAccountOrders))
 	router.GET("/usageapi/v1/usages", TimeoutHandle(60000*time.Millisecond, QueryAccountConsumingReports))

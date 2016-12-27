@@ -298,7 +298,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	//}
 
 	if ! isValidPlanType(planType) {
-		JsonResult(w, http.StatusBadRequest, newInvalidParameterError("plan type is invalid"), nil)
+		JsonResult(w, http.StatusBadRequest, newInvalidParameterError("plan type is invalid: " + planType), nil)
 		return
 	}
 
@@ -417,11 +417,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// make the payment
 
-Logger.Warning("000000")
-
 	paymentMoney, err, specialErrCode := createOrder(drytry, db, &orderCreation.Params, order, plan, oldOrder)
 	if err != nil {
-Logger.Warning("000000 aaaaa")
 		var errCode uint = ErrorCodeRenewOrder
 		if specialErrCode > 0 {
 			errCode = uint(specialErrCode)
@@ -429,7 +426,6 @@ Logger.Warning("000000 aaaaa")
 		JsonResult(w, http.StatusBadRequest, GetError2(errCode, err.Error()), nil)
 		return
 	}
-Logger.Warning("9999999")
 
 	// ...
 
@@ -643,8 +639,6 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-Logger.Warning("aaaaaaaaa")
-
 	// ...
 
 	db := getDB()
@@ -692,7 +686,6 @@ Logger.Warning("aaaaaaaaa")
 	}
 
 	// auth
-Logger.Warning("bbbbbbbbbb")
 
 	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
@@ -742,19 +735,18 @@ Logger.Warning("bbbbbbbbbb")
 	offset, size := optionalOffsetAndSize(r, 30, 1, 100)
 	//orderBy := usage.ValidateOrderBy(r.FormValue("orderby"))
 	//sortOrder := usage.ValidateSortOrder(r.FormValue("sortorder"), false)
-Logger.Warning("ccccccccccc")
+
 	count, orders, err := usage.QueryOrders(db, accountId, region, resName, planType, status, renewalFailedOnly, offset, size)
 	if err != nil {
 		JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodeQueryOrders, err.Error()), nil)
 		return
 	}
-Logger.Warning("hhhhhhhhhhh")
+
 	for _, o := range orders {
 		o.StatusLabel = orderStatusToLabel(o.Status)
 	}
 
 	// ...
-Logger.Warning("iiiiiiiiiiii")
 	type NamedOrder struct {
 		Order *usage.PurchaseOrder `json:"order,omitempty"`
 	}
@@ -762,7 +754,6 @@ Logger.Warning("iiiiiiiiiiii")
 	for i, o := range orders {
 		result[i].Order = o
 	}
-Logger.Warning("jjjjjjjjjj")
 
 	JsonResult(w, http.StatusOK, nil, newQueryListResult(count, result))
 }
