@@ -684,6 +684,7 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 
 	sizeGB, err := plan.ParsePlanVolume()
 	if err != nil {
+		Logger.Errorf("plan.ParsePlanVolum error: %s", err)
 		return err
 	}
 
@@ -691,6 +692,7 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 
 	oc := osAdminClients[region]
 	if oc == nil {
+		Logger.Errorf("createPersistentVolume: open shift client not found for region: %s", region)
 		return fmt.Errorf("createPersistentVolume: open shift client not found for region: %s", region)
 	}
 	adminToken := oc.BearerToken()
@@ -706,12 +708,13 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 	}
 	body, err := json.Marshal(vco)
 	if err != nil {
-		Logger.Infof("createPersistentVolume Marshal error: %s", err.Error())
+		Logger.Errorf("createPersistentVolume Marshal error: %s", err.Error())
 		return err
 	}
 
 	volumeService := VolumeServices[region]
 	if volumeService == "" {
+		Logger.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
 		return fmt.Errorf("createPersistentVolume: volumeService not found for region: %s", region)
 	}
 
@@ -719,12 +722,12 @@ func createPersistentVolume(usernameForLog, volumeName, region, project string, 
 
 	response, data, err := common.RemoteCallWithJsonBody("POST", url, adminToken, "", []byte(body))
 	if err != nil {
-		Logger.Infof("createPersistentVolume error: %s", err.Error())
+		Logger.Errorf("createPersistentVolume error: %s", err.Error())
 		return err
 	}
 
 	if response.StatusCode != http.StatusOK {
-		Logger.Infof("createPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
+		Logger.Errorf("createPersistentVolume remote (%s) status code: %d. data=%s", url, response.StatusCode, string(data))
 		return fmt.Errorf("createPersistentVolume remote (%s) status code: %d.", url, response.StatusCode)
 	}
 
@@ -740,12 +743,14 @@ func destroyPersistentVolume(volumeName, region, project string) error {
 
 	oc := osAdminClients[region]
 	if oc == nil {
+		Logger.Errorf("destroyPersistentVolume: open shift client not found for region: %s", region)
 		return fmt.Errorf("destroyPersistentVolume: open shift client not found for region: %s", region)
 	}
 	adminToken := oc.BearerToken()
 
 	volumeService := VolumeServices[region]
 	if volumeService == "" {
+		Logger.Errorf("destroyPersistentVolume: volumeService not found for region: %s", region)
 		return fmt.Errorf("destroyPersistentVolume: volumeService not found for region: %s", region)
 	}
 
@@ -778,11 +783,13 @@ func createBSI(usernameForLog, bsiName, region, project string, plan *Plan) erro
 
 	serviceName, servicePlanUUID, err := plan.ParsePlanBSI()
 	if err != nil {
+		Logger.Errorf("plan.ParsePlanBSI", plan.Id, plan.Plan_id)
 		return err
 	}
 
 	oc := osAdminClients[region]
 	if oc == nil {
+		Logger.Errorf("createBSI: open shift client not found for region: %s", region)
 		return fmt.Errorf("createBSI: open shift client not found for region: %s", region)
 	}
 
@@ -824,9 +831,12 @@ func destroyBSI(bsiName, region, project string) error {
 		return nil
 	}
 
+	retryOnFailedToDelete := true
+
 RETRY:
 	oc := osAdminClients[region]
 	if oc == nil {
+		Logger.Errorf("destroyBSI: open shift client not found for region: %s", region)
 		return fmt.Errorf("destroyBSI: open shift client not found for region: %s", region)
 	}
 
@@ -837,6 +847,10 @@ RETRY:
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.OGet(uri, &theBSI)
 		if osRest.Err != nil {
+			if osRest.StatusCode == http.StatusNotFound {
+				return nil
+			}
+
 			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
@@ -931,6 +945,7 @@ RETRY:
 
 			if bsi == nil {
 				// get return 404 from above goroutine
+				Logger.Errorf("unbindBSI: bsi not found.", region, uri)
 				return errors.New("bsi not found")
 			}
 
@@ -956,6 +971,10 @@ DELETE:
 		osRest := openshift.NewOpenshiftREST(oc)
 		osRest.ODelete(uri, nil)
 		if osRest.Err != nil {
+			if osRest.StatusCode == http.StatusNotFound {
+				return nil
+			}
+
 			Logger.Errorf("region(%s), uri(%s) error: %s", region, uri, osRest.Err)
 			return osRest.Err
 		}
@@ -964,13 +983,24 @@ DELETE:
 	{
 		err := delF()
 		if err != nil {
-			return err
+			if retryOnFailedToDelete {
+				retryOnFailedToDelete = false
+				goto RETRY
+			} else {
+				return err
+			}
 		}
+
 		// may need to delete twice
-		time.Sleep(10 * time.Second)
-		delF()
+		time.Sleep(5 * time.Second)
+		err = delF()
 		if err != nil {
-			// return err // need?
+			if retryOnFailedToDelete {
+				retryOnFailedToDelete = false
+				goto RETRY
+			} else {
+				return err
+			}
 		}
 	}
 

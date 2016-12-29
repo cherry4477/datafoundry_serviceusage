@@ -158,8 +158,6 @@ func OrderRenewReason(orderId string, renewTimes int) string {
 // the last return result means the exact error reason id. If its value <= 0, it will be ignored.
 func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, order *usage.PurchaseOrder, plan *Plan, oldOrder *usage.PurchaseOrder) (float32, error, int) {
 
-Logger.Warning("1111111")
-
 	var err error
 	var lastConsume *usage.ConsumeHistory
 	if oldOrder != nil {
@@ -257,17 +255,14 @@ Logger.Warning("1111111")
 	case PLanCircle_Month:
 		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
-Logger.Warning("222222222")
 	// ...
 
 	if paymentMoney > 0.0 {
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
 
-Logger.Warning("222222222 aaaaaa")
 		//err, insufficientBalance := makePayment(openshift.AdminToken(), order.Region, accountId, paymentMoney, paymentReason)
 		err, insufficientBalance := makePayment(order.Region, order.Account_id, paymentMoney, paymentReason)
 		if err != nil {
-Logger.Warning("222222222 bbbbb")
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
 				Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
@@ -279,16 +274,13 @@ Logger.Warning("222222222 bbbbb")
 				return 0.0, err, -1
 			}
 		}
-Logger.Warning("222222222 cccccc")
 		// todo: looks this line is useless now. 
 		// for usage.RenewOrder will do it. 
 		//order.Last_consume_id = order.Last_consume_id + 1
 	}
 
 	// ...
-Logger.Warning("3333333")
 	if lastConsume != nil {
-Logger.Warning("33333333 aaaaaaa")
 		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
 		if err != nil {
 			return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
@@ -296,17 +288,15 @@ Logger.Warning("33333333 aaaaaaa")
 	}
 
 	// ...
-Logger.Warning("4444444444")
 	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
 					plan.Price, plan.Id, consumExtraInfo)
 	if err != nil {
-Logger.Warning("4444444444 aaaaaaa")
 		// todo: retry
 
 		Logger.Warningf("RenewOrder error: %s", err.Error())
 		return paymentMoney, err, -1
 	}
-Logger.Warning("55555555555")
+
 	// CreateConsumeHistory has been merged into RenewOrder above
 	// ... 
 	//go func() {
@@ -335,21 +325,17 @@ Logger.Warning("55555555555")
 			
 			return nil, 0
 		case PLanType_Quotas:
-Logger.Warning("5555555555 aaaaaaaa")
 			switch consumExtraInfo {
 			case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
 				err := changeDfProjectQuotaWithPlan(order.Creator, order.Region, order.Account_id, plan)
 				if err != nil {
 					// todo: retry
-Logger.Warning("5555555555 bbbbbbbbbb")
 
 					Logger.Warningf("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) error: %s", 
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 					
 					return err, ErrorCodeChargedButFailedToCreateResource
 				}
-
-Logger.Warning("5555555555 cccccccccccc")
 			}
 
 		case PLanType_Volume:
@@ -382,7 +368,6 @@ Logger.Warning("5555555555 cccccccccccc")
 
 		return nil, 0
 	}()
-Logger.Warning("666666")
 	// ...
 
 	return paymentMoney, finalErr, specialErrReason
