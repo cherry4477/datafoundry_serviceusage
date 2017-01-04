@@ -498,6 +498,8 @@ func ModifyOrder(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	username, e := validateAuth(oldOrder.Region, r.Header.Get("Authorization"))
 	if e != nil {
+		Logger.Warning("validateAuth err", r.Header.Get("Authorization"), ",", oldOrder.Region, e)
+
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
@@ -596,6 +598,8 @@ func GetAccountOrder(w http.ResponseWriter, r *http.Request, params httprouter.P
 
 		username, e := validateAuth(order.Region, r.Header.Get("Authorization"))
 		if e != nil {
+			Logger.Warning("validateAuth err", r.Header.Get("Authorization"), ",", order.Region, e)
+
 			JsonResult(w, http.StatusUnauthorized, e, nil)
 			return
 		}
@@ -689,6 +693,8 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 
 	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
+		Logger.Warning("validateAuth err", r.Header.Get("Authorization"), ",", region, e)
+
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
@@ -708,6 +714,7 @@ func QueryAccountOrders(w http.ResponseWriter, r *http.Request, params httproute
 	if accountId != username {
 		_, err := getDfProject(region, username, r.Header.Get("Authorization"), accountId)
 		if err != nil {
+
 			JsonResult(w, http.StatusBadRequest, GetError2(ErrorCodePermissionDenied, err.Error()), nil)
 			return
 		}
@@ -811,6 +818,8 @@ func QueryAccountConsumingReports(w http.ResponseWriter, r *http.Request, params
 
 	username, e := validateAuth(region, r.Header.Get("Authorization"))
 	if e != nil {
+		Logger.Warning("validateAuth err", r.Header.Get("Authorization"), ",", region, e)
+
 		JsonResult(w, http.StatusUnauthorized, e, nil)
 		return
 	}
