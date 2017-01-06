@@ -194,11 +194,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 		now := time.Now()
 
-		if now.Before(lastConsume.Consume_time) { // impossible
-
-			return 0.0, fmt.Errorf("last consume time is after now"), -1
-
-		} else if now.After(lastConsume.Deadline_time) {
+		if now.After(lastConsume.Deadline_time) {
 
 			remaingMoney = 0.0
 
@@ -206,6 +202,14 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 			paymentMoney = plan.Price
 			consumExtraInfo = usage.ConsumeExtraInfo_NewOrder
+		} else if now.Before(lastConsume.Consume_time) {
+			// impossible
+			// return 0.0, fmt.Errorf("last consume time is after now"), -1
+			
+			// this is not impossible.
+			// last consume may created 7 days before the order expires.
+
+			return 0.0, fmt.Errorf("last consume time is after now"), -1
 
 		} else {
 
@@ -255,7 +259,109 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 	case PLanCircle_Month:
 		extendedDuration = usage.DeadlineExtendedDuration_Month
 	}
-	// ...
+
+	// alloc resource, first round 
+
+	// now, some resources will be alloced in the first round,
+	// bit some others will be alloced in the second round.
+	// All plan types should be listed in the switch block of the first round.
+
+	paymentSucceeded := false
+
+	// first round
+	allocResErr1, allocResReason1 := func() (error, int) {
+		if createParams == nil { // 
+			return nil, -1
+		}
+
+		switch plan.Plan_type {
+		default:
+			Logger.Errorf("createOrder, unknown plan type: %s", plan.Plan_type)
+			
+			return fmt.Errorf("createOrder, unknown plan type: %s", plan.Plan_type), 0
+		case PLanType_Quotas:
+			// will be alloced in the second round
+		case PLanType_Volume:
+
+			err := createPersistentVolume(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("createPV (%s, %s, %s, %s, %s) error: %s", 
+					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
+				
+				return err, ErrorCodeChargedButFailedToCreateResource
+			}
+
+			Logger.Infof("createPV (%s, %s, %s, %s, %s) succeeded", 
+					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id)
+
+			defer func() {
+				if paymentSucceeded {
+					return
+				}
+
+				Logger.Warningf("roll back createPV (%s, %s, %s, %s, %s)", 
+						order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id)
+
+				// roll back
+
+				err2 := destroyPersistentVolume(createParams.ResName, order.Region, order.Account_id)
+				if err2 != nil {
+					Logger.Warningf("roll back createPV (%s, %s, %s, %s, %s) failed: %s", 
+							order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err2.Error())
+					return
+				}
+
+
+				Logger.Warningf("roll back createPV succeeded")
+			}()
+
+		case PLanType_BSI:
+
+			err := createBSI(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
+			if err != nil {
+				// todo: retry
+				
+				Logger.Warningf("createBSI (%s, %s, %s, %s, %s) error: %s", 
+					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
+
+				return err, ErrorCodeChargedButFailedToCreateResource
+			}
+
+			Logger.Infof("createBSI (%s, %s, %s, %s, %s) succeeded", 
+					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id)
+
+			defer func() {
+				if paymentSucceeded {
+					return
+				}
+
+				Logger.Warningf("roll back createBSI (%s, %s, %s, %s, %s)", 
+						order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id)
+
+				// roll back
+
+				err2 := destroyBSI(createParams.ResName, order.Region, order.Account_id)
+				if err2 != nil {
+					Logger.Warningf("roll back createBSI (%s, %s, %s, %s, %s) failed: %s", 
+							order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err2.Error())
+					
+					return
+				}
+
+				Logger.Warningf("roll back createBSI succeeded")
+			}()
+		}
+
+		return nil, -1
+	}()
+
+	if allocResErr1 != nil {
+		return paymentMoney, allocResErr1, allocResReason1
+	}
+
+	// make payment
 
 	if paymentMoney > 0.0 {
 		paymentReason := OrderRenewReason(order.Order_id, order.Last_consume_id + 1)
@@ -263,67 +369,36 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		//err, insufficientBalance := makePayment(openshift.AdminToken(), order.Region, accountId, paymentMoney, paymentReason)
 		err, insufficientBalance := makePayment(order.Region, order.Account_id, paymentMoney, paymentReason)
 		if err != nil {
+			Logger.Warning("makePayment error:", err.Error(), order.Region, order.Account_id, paymentMoney, paymentReason)
+			
 			err2 := usage.IncreaseOrderRenewalFails(db, order.Id)
 			if err2 != nil {
 				Logger.Warningf("IncreaseOrderRenewalFails error: %s", err2.Error())
-			}
+			} 
 
 			if insufficientBalance {
-				return 0.0, err, ErrorCodeInsufficentBalance
+				return paymentMoney, err, ErrorCodeInsufficentBalance
 			} else {
-				return 0.0, err, -1
+				return paymentMoney, err, -1
 			}
 		}
 		// todo: looks this line is useless now. 
 		// for usage.RenewOrder will do it. 
 		//order.Last_consume_id = order.Last_consume_id + 1
+
+		// todo: it is best to support rolling back payment
 	}
 
-	// ...
-	if lastConsume != nil {
-		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
-		if err != nil {
-			return 0.0, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
-		}
-	}
+	paymentSucceeded = true
 
-	// ...
-	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
-					plan.Price, plan.Id, consumExtraInfo)
-	if err != nil {
-		// todo: retry
+	// alloc resource, second round 
 
-		Logger.Warningf("RenewOrder error: %s", err.Error())
-		return paymentMoney, err, -1
-	}
-
-	// CreateConsumeHistory has been merged into RenewOrder above
-	// ... 
-	//go func() {
-	//
-	//	// err = usage.CreateConsumeHistory(db, order, now, paymentMoney, plan.Id, consumExtraInfo)
-	//	err = usage.CreateConsumeHistory(db, order, time.Now(), plan.Price, plan.Id, consumExtraInfo)
-	//	if err != nil {
-	//		// todo: retry
-	//
-	//		Logger.Warningf("CreateConsumeHistory error: %s", err.Error())
-	//		//return paymentMoney, err, false
-	//	}
-	//}()
-
-	// ... 
-
-	//go 
-	finalErr, specialErrReason := func() (error, int) {
+	allocResErr2, allocResReason2 := func() (error, int) {
 		if createParams == nil { // 
-			return nil, 0
+			return nil, -1
 		}
 
 		switch plan.Plan_type {
-		default:
-			Logger.Warningf("createOrder, unknown plan type: %s", plan.Plan_type)
-			
-			return nil, 0
 		case PLanType_Quotas:
 			switch consumExtraInfo {
 			case usage.ConsumeExtraInfo_NewOrder, usage.ConsumeExtraInfo_SwitchOrder:
@@ -338,39 +413,40 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				}
 			}
 
-		case PLanType_Volume:
-
-			err := createPersistentVolume(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("createPersistentVolume (%s, %s, %s, %s) error: %s", 
-					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
-				
-				return err, ErrorCodeChargedButFailedToCreateResource
-			}
-
-		case PLanType_BSI:
-
-			err := createBSI(order.Creator, createParams.ResName, order.Region, order.Account_id, plan)
-			if err != nil {
-				// todo: retry
-				
-				Logger.Warningf("createBSI (%s, %s, %s, %s) error: %s", 
-					order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
-
-				return err, ErrorCodeChargedButFailedToCreateResource
-			}
-
-			Logger.Infof("createBSI (%s, %s, %s, %s) succeeded", 
-					order.Creator, order.Region, order.Account_id, plan.Plan_id)
+			Logger.Infof("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) succeeded", 
+				order.Creator, order.Region, order.Account_id, plan.Plan_id)
 		}
 
-		return nil, 0
+		return nil, -1
 	}()
+
+	if allocResErr2 != nil {
+		return paymentMoney, allocResErr2, allocResReason2
+	}
+
+	// create consume history
+
+	if lastConsume != nil {
+		err := usage.EndOrder(db, oldOrder, time.Now(), /*lastConsume,*/ remaingMoney)
+		if err != nil {
+			return paymentMoney, fmt.Errorf("end old order (%s) error: %s", oldOrder.Order_id, err.Error()), -1
+		}
+	}
+
+	// modiry order status
+
+	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
+					plan.Price, plan.Id, consumExtraInfo)
+	if err != nil {
+		// todo: retry
+
+		Logger.Warningf("RenewOrder error: %s", err.Error())
+		return paymentMoney, err, -1
+	}
+
 	// ...
 
-	return paymentMoney, finalErr, specialErrReason
+	return paymentMoney, nil, -1
 }
 
 
@@ -387,7 +463,7 @@ func endOrder(db *sql.DB, order *usage.PurchaseOrder) error {
 		if err != nil {
 			// todo: retry
 			
-			return fmt.Errorf("onInsufficientBalance changeDfProjectQuota (%s, %s, %s, 0, 0) error: %s", 
+			return fmt.Errorf("endOrder changeDfProjectQuota (%s, %s, %s, 0, 0) error: %s", 
 				order.Creator, order.Region, order.Account_id, err.Error())
 		}
 
@@ -397,7 +473,7 @@ func endOrder(db *sql.DB, order *usage.PurchaseOrder) error {
 		if err != nil {
 			// todo: retry
 			
-			return fmt.Errorf("onInsufficientBalance destroyPersistentVolume (%s, %s, %s) error: %s", 
+			return fmt.Errorf("endOrder destroyPersistentVolume (%s, %s, %s) error: %s", 
 				order.Resource_name, order.Region, order.Account_id, err.Error())
 		}
 
@@ -407,7 +483,7 @@ func endOrder(db *sql.DB, order *usage.PurchaseOrder) error {
 		if err != nil {
 			// todo: retry
 			
-			return fmt.Errorf("onInsufficientBalance destroyBSI (%s, %s, %s) error: %s", 
+			return fmt.Errorf("endOrder destroyBSI (%s, %s, %s) error: %s", 
 				order.Resource_name, order.Region, order.Account_id, err.Error())
 		}
 	}
@@ -416,18 +492,18 @@ func endOrder(db *sql.DB, order *usage.PurchaseOrder) error {
 
 	//lastConsume, err := usage.RetrieveConsumeHistory(db, order.Id, order.Order_id, order.Last_consume_id)
 	//if err != nil {
-	//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s) error: %s", order.Id, err.Error())
+	//	Logger.Errorf("TryToRenewConsumingOrders endOrder RetrieveConsumeHistory (%s) error: %s", order.Id, err.Error())
 	//	return false
 	//}
 	//
 	//if lastConsume == nil {
-	//	Logger.Errorf("TryToRenewConsumingOrders onInsufficientBalance RetrieveConsumeHistory (%s): lastConsume == nil", order.Id)
+	//	Logger.Errorf("TryToRenewConsumingOrders endOrder RetrieveConsumeHistory (%s): lastConsume == nil", order.Id)
 	//	return false
 	//}
 
 	err := usage.EndOrder(db, order, time.Now(), /*lastConsume,*/ 0.0)
 	if err != nil {
-		return fmt.Errorf("onInsufficientBalance EndOrder (%s, %s, %s) error: %s", 
+		return fmt.Errorf("endOrder EndOrder (%s, %s, %s) error: %s", 
 			order.Resource_name, order.Region, order.Account_id, err.Error())
 	}
 
