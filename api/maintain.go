@@ -272,17 +272,12 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 
 	paymentSucceeded := false
 
-	// first round
-	allocResErr1, allocResReason1 := func() (error, int) {
-		if createParams == nil { // 
-			return nil, -1
-		}
-
+	if createParams != nil  {
 		switch plan.Plan_type {
 		default:
 			Logger.Errorf("createOrder, unknown plan type: %s", plan.Plan_type)
 			
-			return fmt.Errorf("createOrder, unknown plan type: %s", plan.Plan_type), -1
+			return paymentMoney, fmt.Errorf("createOrder, unknown plan type: %s", plan.Plan_type), -1
 		case PLanType_Quotas:
 			// will be alloced in the second round
 		case PLanType_Volume:
@@ -294,7 +289,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createPV (%s, %s, %s, %s, %s) error: %s", 
 					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
 				
-				return err, ErrorCodeChargedButFailedToCreateResource
+				return paymentMoney, err, ErrorCodeChargedButFailedToCreateResource
 			}
 
 			Logger.Infof("createPV (%s, %s, %s, %s, %s) succeeded", 
@@ -330,7 +325,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createBSI (%s, %s, %s, %s, %s) error: %s", 
 					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
 
-				return err, ErrorCodeChargedButFailedToCreateResource
+				return paymentMoney, err, ErrorCodeChargedButFailedToCreateResource
 			}
 
 			Logger.Infof("createBSI (%s, %s, %s, %s, %s) succeeded", 
@@ -357,12 +352,6 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("roll back createBSI succeeded")
 			}()
 		}
-
-		return nil, -1
-	}()
-
-	if allocResErr1 != nil {
-		return paymentMoney, allocResErr1, allocResReason1
 	}
 
 	// make payment
@@ -391,17 +380,15 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		//order.Last_consume_id = order.Last_consume_id + 1
 
 		// todo: it is best to support rolling back payment
+
+		Logger.Info("makePayment succeeded")
 	}
 
 	paymentSucceeded = true
 
 	// alloc resource, second round 
 
-	allocResErr2, allocResReason2 := func() (error, int) {
-		if createParams == nil { // 
-			return nil, -1
-		}
-
+	if createParams != nil {
 		switch plan.Plan_type {
 		case PLanType_Quotas:
 			switch consumExtraInfo {
@@ -413,19 +400,13 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 					Logger.Warningf("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) error: %s", 
 						order.Creator, order.Region, order.Account_id, plan.Plan_id, err.Error())
 					
-					return err, ErrorCodeChargedButFailedToCreateResource
+					return paymentMoney, err, ErrorCodeChargedButFailedToCreateResource
 				}
 			}
 
 			Logger.Infof("changeDfProjectQuotaWithPlan (%s, %s, %s, %s) succeeded", 
 				order.Creator, order.Region, order.Account_id, plan.Plan_id)
 		}
-
-		return nil, -1
-	}()
-
-	if allocResErr2 != nil {
-		return paymentMoney, allocResErr2, allocResReason2
 	}
 
 	// create consume history
