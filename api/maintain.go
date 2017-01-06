@@ -192,6 +192,10 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		}
 	} else {
 
+		// todo: remove the restricts on renew/switch orders
+		// 1. can't switch to a low-price plan
+		// 2. can't renew order before lastConsumeTime
+
 		now := time.Now()
 
 		if now.After(lastConsume.Deadline_time) {
@@ -278,7 +282,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		default:
 			Logger.Errorf("createOrder, unknown plan type: %s", plan.Plan_type)
 			
-			return fmt.Errorf("createOrder, unknown plan type: %s", plan.Plan_type), 0
+			return fmt.Errorf("createOrder, unknown plan type: %s", plan.Plan_type), -1
 		case PLanType_Quotas:
 			// will be alloced in the second round
 		case PLanType_Volume:
