@@ -44,7 +44,8 @@ const (
 	ErrorCodeInsufficentBalance    = 3316 // DON'T CHAGNE	
 
 	ErrorCodeChargedButFailedToCreateResource = 3317 // DON'T CHAGNE	
-	ErrorCodeOrderNotFound                    = 3318 // DON'T CHAGNE	
+	ErrorCodeOrderNotFound                    = 3318 // DON'T CHAGNE
+	ErrorFailedToCreateResource               = 3319 // DON'T CHAGNE	
 
 
 
@@ -77,6 +78,7 @@ func init() {
 	initError(ErrorCodeInsufficentBalance, "insufficient balance")
 	initError(ErrorCodeChargedButFailedToCreateResource, "charged but failed to create resource")
 	initError(ErrorCodeOrderNotFound, "not found")
+	initError(ErrorFailedToCreateResource, "failed to create resource")
 
 	ErrorNone = GetError(ErrorCodeNone)
 	ErrorUnkown = GetError(ErrorCodeUnkown)
