@@ -316,7 +316,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createPV (%s, %s, %s, %s, %s) error: %s", 
 					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
 				
-				return paymentMoney, err, ErrorCodeChargedButFailedToCreateResource
+				return paymentMoney, err, ErrorFailedToCreateResource
 			}
 
 			Logger.Infof("createPV (%s, %s, %s, %s, %s) succeeded", 
@@ -352,7 +352,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 				Logger.Warningf("createBSI (%s, %s, %s, %s, %s) error: %s", 
 					order.Creator, createParams.ResName, order.Region, order.Account_id, plan.Plan_id, err.Error())
 
-				return paymentMoney, err, ErrorCodeChargedButFailedToCreateResource
+				return paymentMoney, err, ErrorFailedToCreateResource
 			}
 
 			Logger.Infof("createBSI (%s, %s, %s, %s, %s) succeeded", 
