@@ -192,11 +192,22 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		}
 	} else {
 
-		// todo: remove the restricts on renew/switch orders
-		// 1. can't switch to a low-price plan
-		// 2. can't renew order before lastConsumeTime
-
 		now := time.Now()
+
+		// todo: remove the restricts on renew/switch orders
+		// 1. can't switch to a low-price plan (downgrade)
+
+		calRemainingMoney := func(consume *usage.ConsumeHistory) float32 {
+
+			// todo: check plan_type?
+			// only ok for PLanCircle_Month now?
+			const DayDuration = float64(time.Hour * 24)
+
+			remainingDays := math.Floor(float64(consume.Deadline_time.Sub(now)) / DayDuration)
+			allDays := math.Floor(0.5 + float64(consume.Deadline_time.Sub(consume.Consume_time)) / DayDuration)
+			ratio := float32(remainingDays) / float32(allDays)
+			return 0.01 * float32(math.Floor(float64(ratio * consume.Money) * 100.0))
+		}
 
 		if now.After(lastConsume.Deadline_time) {
 
@@ -210,26 +221,42 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 			// impossible
 			// return 0.0, fmt.Errorf("last consume time is after now"), -1
 			
+			// [edit]
 			// this is not impossible.
 			// last consume may created 7 days before the order expires.
 
-			return 0.0, fmt.Errorf("last consume time is after now"), -1
+			//return 0.0, fmt.Errorf("last consume time is after now"), -1
 
+			// todo: check plan_type?
+			// only ok for PLanCircle_Month now?
+			
+			lastlastConsume, err := usage.RetrieveConsumeHistory(db, oldOrder.Id, oldOrder.Order_id, oldOrder.Last_consume_id-1)
+			if err != nil {
+				return 0.0, fmt.Errorf("Failed to switch plan (last last consume): " + err.Error()), -1
+			}
+
+			remaingMoney = calRemainingMoney(lastlastConsume) + lastConsume.Money
+			if remaingMoney > plan.Price {
+
+				// todo: support this
+
+				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending (last last)", lastConsume.Order_id), -1
+			}
+
+			// ...
+
+			paymentMoney = plan.Price - remaingMoney
+			consumExtraInfo = usage.ConsumeExtraInfo_SwitchOrder
 		} else {
 
 			// by current design, plan.price must be larger than or equal 
 			// the remaining charging of the last payment.
-			const DayDuration = float64(time.Hour * 24)
 
-			remainingDays := math.Floor(float64(lastConsume.Deadline_time.Sub(now)) / DayDuration)
-			allDays := math.Floor(0.5 + float64(lastConsume.Deadline_time.Sub(lastConsume.Consume_time)) / DayDuration)
-			ratio := float32(remainingDays) / float32(allDays)
-			remaingMoney = ratio * lastConsume.Money
-			remaingMoney = 0.01 * float32(math.Floor(float64(remaingMoney) * 100.0))
-
+			remaingMoney = calRemainingMoney(lastConsume)
 			if remaingMoney > plan.Price {
 
-				// todo: now, withdraw is not supported
+				// todo: support this
+
 				return 0.0, fmt.Errorf("old order (%s) has too much remaining spending", lastConsume.Order_id), -1
 			}
 
