@@ -445,7 +445,7 @@ func createOrder(drytry bool, db *sql.DB, createParams *OrderCreationParams, ord
 		}
 	}
 
-	// modiry order status
+	// modify order status
 
 	order, err = usage.RenewOrder(db, order.Id, order.Last_consume_id, extendedDuration,
 					plan.Price, plan.Id, consumExtraInfo)
