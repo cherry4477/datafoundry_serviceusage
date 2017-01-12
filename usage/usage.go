@@ -110,8 +110,8 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 				return 0, errors.New("too frequently")
 			}
 		} else {
-			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and RESOURCE_NAME=? and STATUS=?")
-			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Resource_name, OrderStatus_Consuming}
+			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and PLAN_TYPE=? and RESOURCE_NAME=? and STATUS=?")
+			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Plan_type, orderInfo.Resource_name, OrderStatus_Consuming}
 			count, err := queryOrdersCount(tx, sqlWhere, params...)
 			if err != nil {
 				tx.Rollback()

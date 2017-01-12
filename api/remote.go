@@ -241,14 +241,31 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 	const Mi = int64(1) << 20
 	const Gi = int64(1) << 30
 
-	cpuQuantity := *kapiresource.NewQuantity(int64(cpus), kapiresource.DecimalSI)
-	memQuantity := *kapiresource.NewQuantity(int64(mems)*Gi, kapiresource.BinarySI)
+	cpusQuota := int64(cpus)
+	memsQuota := int64(mems)*Gi
 
-	cpuQuantity_PodMin := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
-	memQuantity_PodMin := *kapiresource.NewQuantity(6*Mi, kapiresource.BinarySI)
+	var cpusPodMin int64 = 100
+	if cpusPodMin > cpusQuota {
+		cpusPodMin = cpusQuota
+	}
+	var cpusContainerMin int64 = cpusPodMin
+	//var cpusContainerDefault int64 = cpusQuota
 
-	cpuQuantity_ContainerMin := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
-	memQuantity_ContainerMin := *kapiresource.NewQuantity(4*Mi, kapiresource.BinarySI)
+	var memsPodMin int64 = 6*Mi
+	if memsPodMin > memsQuota {
+		memsPodMin = memsQuota
+	}
+	var memsContainerMin int64 = memsPodMin
+	//var memsContainerDefault int64 = memsQuota
+
+	cpuQuantity := *kapiresource.NewQuantity(cpusQuota, kapiresource.DecimalSI)
+	memQuantity := *kapiresource.NewQuantity(memsQuota, kapiresource.BinarySI)
+
+	cpuQuantity_PodMin := *kapiresource.NewMilliQuantity(cpusPodMin, kapiresource.DecimalSI)
+	memQuantity_PodMin := *kapiresource.NewQuantity(memsPodMin, kapiresource.BinarySI)
+
+	cpuQuantity_ContainerMin := *kapiresource.NewMilliQuantity(cpusContainerMin, kapiresource.DecimalSI)
+	memQuantity_ContainerMin := *kapiresource.NewQuantity(memsContainerMin, kapiresource.BinarySI)
 
 	cpuQuantity_ContainerDefault := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
 	memQuantity_ContainerDefault := *kapiresource.NewQuantity(500*Mi, kapiresource.BinarySI)
