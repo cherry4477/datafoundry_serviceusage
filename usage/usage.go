@@ -10,7 +10,7 @@ import (
 	//"io/ioutil"
 	//"path/filepath"s
 	stat "github.com/asiainfoLDP/datafoundry_serviceusage/statistics"
-	//"github.com/asiainfoLDP/datahub_commons/log"
+	"github.com/asiainfoLDP/datahub_commons/log"
 )
 
 //=============================================================
@@ -113,6 +113,7 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and PLAN_TYPE=? and RESOURCE_NAME=? and STATUS=?")
 			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Plan_type, orderInfo.Resource_name, OrderStatus_Consuming}
 			count, err := queryOrdersCount(tx, sqlWhere, params...)
+			log.DefaultLogger().Infof("CreateOrder, check duplicated. sqlWhere=", sqlWhere, ", , params=", params)
 			if err != nil {
 				tx.Rollback()
 				return 0, err
