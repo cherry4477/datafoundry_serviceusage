@@ -113,7 +113,6 @@ func CreateOrder(db *sql.DB, orderInfo *PurchaseOrder) (int64, error) {
 			sqlWhere := fmt.Sprintf("REGION=? and ACCOUNT_ID=? and PLAN_TYPE=? and RESOURCE_NAME=? and STATUS=?")
 			params := []interface{}{orderInfo.Region, orderInfo.Account_id, orderInfo.Plan_type, orderInfo.Resource_name, OrderStatus_Consuming}
 			count, err := queryOrdersCount(tx, sqlWhere, params...)
-			log.DefaultLogger().Infof("CreateOrder, check duplicated. sqlWhere=", sqlWhere, ", , params=", params)
 			if err != nil {
 				tx.Rollback()
 				return 0, err
@@ -881,6 +880,8 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 	
 	// println("sql_str = ", sql_str)
 
+	log.DefaultLogger().Debug("queryOrders, sql_str=", sql_str, ", sqlParams=", sqlParams)
+
 	rows, err := db.Query(sql_str, sqlParams...)
 
 	if err != nil {
@@ -1096,7 +1097,6 @@ func queryConsumings(db DbOrTx, sqlWhere string, limit int, offset int64, sqlPar
 		sql_where_all,
 		limit,
 		offset_str)
-
 	rows, err := db.Query(sql_str, sqlParams...)
 
 	if err != nil {
