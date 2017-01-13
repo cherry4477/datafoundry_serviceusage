@@ -249,14 +249,21 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 		cpusPodMin = cpusQuota
 	}
 	var cpusContainerMin int64 = cpusPodMin
-	//var cpusContainerDefault int64 = cpusQuota
 
 	var memsPodMin int64 = 6*Mi
 	if memsPodMin > memsQuota {
 		memsPodMin = memsQuota
 	}
 	var memsContainerMin int64 = memsPodMin
-	//var memsContainerDefault int64 = memsQuota
+	
+	var cpusContainerDefault int64 = 100
+	if cpusContainerDefault > cpusQuota {
+		cpusContainerDefault = cpusQuota
+	}
+	var memsContainerDefault int64 = 500*Mi
+	if memsContainerDefault > memsQuota {
+		memsContainerDefault = memsQuota
+	}
 
 	cpuQuantity := *kapiresource.NewQuantity(cpusQuota, kapiresource.DecimalSI)
 	memQuantity := *kapiresource.NewQuantity(memsQuota, kapiresource.BinarySI)
@@ -267,8 +274,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 	cpuQuantity_ContainerMin := *kapiresource.NewMilliQuantity(cpusContainerMin, kapiresource.DecimalSI)
 	memQuantity_ContainerMin := *kapiresource.NewQuantity(memsContainerMin, kapiresource.BinarySI)
 
-	cpuQuantity_ContainerDefault := *kapiresource.NewMilliQuantity(100, kapiresource.DecimalSI)
-	memQuantity_ContainerDefault := *kapiresource.NewQuantity(500*Mi, kapiresource.BinarySI)
+	cpuQuantity_ContainerDefault := *kapiresource.NewMilliQuantity(cpusContainerDefault, kapiresource.DecimalSI)
+	memQuantity_ContainerDefault := *kapiresource.NewQuantity(memsContainerDefault, kapiresource.BinarySI)
 
 	namespaceUri := "/namespaces/" + project
 
