@@ -18,6 +18,10 @@ const (
 //
 //=============================================================
 
+var httpClient = &http.Client{
+	Timeout: time.Duration(GeneralRemoteCallTimeout) * time.Second,
+}
+
 func RemoteCallWithBody(method, url string, token, user string, body []byte, contentType string) (*http.Response, []byte, error) {
 	//log.DefaultLogger().Debugf("method: %s, url: %s, token: %s, contentType: %s, body: %s", method, url, token, contentType, string(body))
 	
@@ -41,11 +45,12 @@ func RemoteCallWithBody(method, url string, token, user string, body []byte, con
 	if user != "" {
 		request.Header.Set("User", user)
 	}
-	client := &http.Client{
-		Timeout: time.Duration(GeneralRemoteCallTimeout) * time.Second,
-	}
 	
-	response, err := client.Do(request)
+	//client := &http.Client{
+	//	Timeout: time.Duration(GeneralRemoteCallTimeout) * time.Second,
+	//}
+	
+	response, err := httpClient.Do(request)
 	if response != nil {
 		defer response.Body.Close()
 	}
