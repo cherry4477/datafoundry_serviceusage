@@ -339,10 +339,8 @@ func (osr *OpenshiftREST) doRequest(method, url string, bodyParams interface{}, 
 	}
 	osr.StatusCode = res.StatusCode
 
-	defer func(){
-
-		res.Body.Close()
-	}()
+	defer res.Body.Close()
+	
 	var data []byte
 	data, osr.Err = ioutil.ReadAll(res.Body)
 	if osr.Err != nil {
