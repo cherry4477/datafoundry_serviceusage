@@ -79,6 +79,11 @@ func CreateOpenshiftClientFromUserToken(host, token string) *OpenshiftClient {
 }
 
 func CreateOpenshiftClient(name, host, username, password string, durPhase time.Duration) *OpenshiftClient {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		//DisableKeepAlives: true,
+	}
+	
 	host = httpsAddrMaker(host)
 	oc := &OpenshiftClient{
 		name: name,
@@ -90,7 +95,17 @@ func CreateOpenshiftClient(name, host, username, password string, durPhase time.
 
 		username: username,
 		password: password,
+
+		HttpClient:  &http.Client{
+			Transport: transport,
+			Timeout:   GeneralRequestTimeout,
+		},
+		WatchClient: &http.Client{
+			Transport: transport,
+			Timeout:   0,
+		},
 	}
+
 	oc.bearerToken.Store("")
 	
 	go oc.updateBearerToken(durPhase)
@@ -111,6 +126,9 @@ type OpenshiftClient struct {
 	password    string
 	//bearerToken string
 	bearerToken atomic.Value
+
+	HttpClient  *http.Client
+	WatchClient *http.Client
 }
 
 // for general user
@@ -120,6 +138,9 @@ func (baseOC *OpenshiftClient) NewOpenshiftClient(token string) *OpenshiftClient
 		host:    baseOC.host,
 		oapiUrl: baseOC.oapiUrl,
 		kapiUrl: baseOC.kapiUrl,
+
+		HttpClient: baseOC.HttpClient,
+		WatchClient: baseOC.WatchClient,
 	}
 
 	oc.setBearerToken(token)
@@ -189,14 +210,21 @@ func (oc *OpenshiftClient) request(method string, url string, body []byte, timeo
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", token)
 
-	transCfg := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	// moved into OpenshiftClient
+	//transCfg := &http.Transport{
+	//	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	//	//DisableKeepAlives: true,
+	//}
+	//client := &http.Client{
+	//	Transport: transCfg,
+	//	Timeout:   timeout,
+	//}
+	
+	if timeout <= 0 {
+		return oc.WatchClient.Do(req)
+	} else {
+		return oc.HttpClient.Do(req)
 	}
-	client := &http.Client{
-		Transport: transCfg,
-		Timeout:   timeout,
-	}
-	return client.Do(req)
 }
 
 type WatchStatus struct {
@@ -310,8 +338,9 @@ func (osr *OpenshiftREST) doRequest(method, url string, bodyParams interface{}, 
 		return osr
 	}
 	osr.StatusCode = res.StatusCode
-	defer res.Body.Close()
 
+	defer res.Body.Close()
+	
 	var data []byte
 	data, osr.Err = ioutil.ReadAll(res.Body)
 	if osr.Err != nil {
