@@ -316,6 +316,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 
 				return osRest.Err
 			}
+
+			Logger.Infof("quota created:", quota)
 		} else {
 			// todo: if old and new are equal, do nothing
 
@@ -327,6 +329,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 
 				return osRest.Err
 			}
+
+			Logger.Infof("quota updated:", quota)
 		}
 	}
 
@@ -391,6 +395,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 
 				return osRest.Err
 			}
+
+			Logger.Infof("quota created:", limit)
 		} else {
 			// todo: if old and new are equal, do nothing
 
@@ -402,6 +408,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 
 				return osRest.Err
 			}
+
+			Logger.Infof("quota updated:", limit)
 		}
 	}
 
