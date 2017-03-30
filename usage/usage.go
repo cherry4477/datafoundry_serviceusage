@@ -10,7 +10,7 @@ import (
 	//"io/ioutil"
 	//"path/filepath"s
 	stat "github.com/asiainfoLDP/datafoundry_serviceusage/statistics"
-	"github.com/asiainfoLDP/datahub_commons/log"
+	//"github.com/asiainfoLDP/datahub_commons/log"
 )
 
 //=============================================================
@@ -880,7 +880,7 @@ func queryOrders(db DbOrTx, sqlWhere string, limit int, offset int64, sqlParams 
 	
 	// println("sql_str = ", sql_str)
 
-	log.DefaultLogger().Debug("queryOrders, sql_str=", sql_str, ", sqlParams=", sqlParams)
+	//log.DefaultLogger().Debug("queryOrders, sql_str=", sql_str, ", sqlParams=", sqlParams)
 
 	rows, err := db.Query(sql_str, sqlParams...)
 
