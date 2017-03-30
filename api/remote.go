@@ -257,8 +257,8 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 	var memsContainerMin int64 = memsPodMin
 	
 	var cpusContainerDefault int64 = 100
-	if cpusContainerDefault > cpusQuota {
-		cpusContainerDefault = cpusQuota
+	if cpusContainerDefault > cpusQuota * 1024 {
+		cpusContainerDefault = cpusQuota * 1024
 	}
 	var memsContainerDefault int64 = 500*Mi
 	if memsContainerDefault > memsQuota {
@@ -396,7 +396,7 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 				return osRest.Err
 			}
 
-			Logger.Infof("quota created:", limit)
+			Logger.Infof("limitranges created:", limit)
 		} else {
 			// todo: if old and new are equal, do nothing
 
@@ -409,7 +409,7 @@ func changeDfProjectQuota(usernameForLog, region, project string, cpus, mems int
 				return osRest.Err
 			}
 
-			Logger.Infof("quota updated:", limit)
+			Logger.Infof("limitranges updated:", limit)
 		}
 	}
 
